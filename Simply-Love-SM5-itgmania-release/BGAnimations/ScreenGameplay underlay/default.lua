@@ -22,12 +22,26 @@ local RestartHandler = function(event)
 			holdingCtrl = false
 		end
 	end
+	
+	if event.type == "InputEventType_FirstPress" then
+		if event.GameButton == "Start" then
+			holdingStart = true
+		elseif event.GameButton == "Select" then
+			if holdingStart then
+				SCREENMAN:GetTopScreen():SetPrevScreenName("ScreenGameplay"):SetNextScreenName("ScreenGameplay"):begin_backing_out()
+			end
+		end
+	elseif event.type == "InputEventType_Release" then
+		if event.GameButton == "Start" then
+			holdingStart = false
+		end
+	end
 end
 
 local t = Def.ActorFrame{
 	Name="GameplayUnderlay",
 	OnCommand=function(self)
-		if ThemePrefs.Get("KeyboardFeatures") and PREFSMAN:GetPreference("EventMode") and not GAMESTATE:IsCourseMode() then
+		if PREFSMAN:GetPreference("EventMode") and not GAMESTATE:IsCourseMode() then
 			SCREENMAN:GetTopScreen():AddInputCallback(RestartHandler)
 		end
 	end
