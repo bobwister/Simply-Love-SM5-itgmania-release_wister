@@ -24,16 +24,16 @@ local RestartHandler = function(event)
 	end
 	
 	if event.type == "InputEventType_FirstPress" then
-		if event.GameButton == "Start" then
-			holdingStart = true
-		elseif event.GameButton == "Select" then
-			if holdingStart then
+		if event.GameButton == "Select" then
+			holdingSelect = true
+		elseif event.GameButton == "Start" then
+			if holdingSelect then
 				SCREENMAN:GetTopScreen():SetPrevScreenName("ScreenGameplay"):SetNextScreenName("ScreenGameplay"):begin_backing_out()
 			end
 		end
 	elseif event.type == "InputEventType_Release" then
-		if event.GameButton == "Start" then
-			holdingStart = false
+		if event.GameButton == "Select" then
+			holdingSelect = false
 		end
 	end
 end
