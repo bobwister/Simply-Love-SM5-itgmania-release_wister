@@ -24,11 +24,14 @@ return Def.ActorFrame{
 	},
 
 	-- player's chart's difficulty meter
-	LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
+	--LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " numbers")..{
 		InitCommand=function(self)
 			self:diffuse( Color.Black )
-			self:zoom( 0.4 )
-			self:y(-4)
+			--self:zoom( 0.4 )
+			self:zoom( 0.24 )
+			--self:y(-4)
+			self:y(-8)
 		end,
 		CurrentSongChangedMessageCommand=function(self) self:queuecommand("Begin") end,
 		BeginCommand=function(self)

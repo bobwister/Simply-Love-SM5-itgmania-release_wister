@@ -79,7 +79,8 @@ for RowNumber=-2, 2 do
 		InitCommand=function(self)
 			local height = 28
 			local spacing = 2
-			self:y((height+spacing)*RowNumber):zoom(0.45)
+			--self:y((height+spacing)*RowNumber):zoom(0.45)
+			self:y((height+spacing)*RowNumber):zoom(0.55)
 		end,
 		SetCommand=function(self, params)
 			-- diffuse and set each chart's difficulty meter
