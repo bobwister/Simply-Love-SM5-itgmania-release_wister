@@ -1,15 +1,19 @@
 return Def.ActorFrame{
-	Def.Quad{
-		InitCommand=function(self) self:FullScreen():Center():diffuse( Color.White ) end
-	},
+	--Def.Quad{
+	--	InitCommand=function(self) self:FullScreen():Center():diffuse( Color.White ) end
+	--},
 
 	--LoadActor( THEME:GetPathB("", "_shared background") ),
 	
 	Def.Sprite{
 		Texture="./_shared background/CJ126/CJ126 Normal.mp4",--use the video without the lua animations
 		OnCommand=function(self)
-			self:rate(1.0):diffusealpha(0.7):stretchto(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
+			self:rate(1.0):diffusealpha(0.8):stretchto(0,0,SCREEN_WIDTH,SCREEN_HEIGHT)
 		end;
+	},
+	
+	Def.Quad{
+		InitCommand=function(self) self:FullScreen():Center():diffuse( Color.Black ):diffusealpha(0.2) end
 	},
 
 	Def.Quad{
