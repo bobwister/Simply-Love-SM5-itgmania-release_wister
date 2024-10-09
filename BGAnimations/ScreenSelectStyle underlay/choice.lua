@@ -50,7 +50,8 @@ local af = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 		Text=THEME:GetString("ScreenSelectStyle", choiceName:gsub("^%l", string.upper)),
 		InitCommand=function(self)
-			self:shadowlength(1):y(37):zoom(0.5)
+			--self:shadowlength(1):y(37):zoom(0.5)
+			self:shadowlength(1):y(37):zoom(0.8)
 		end,
 		GainFocusCommand=function(self) if ThemePrefs.Get("VisualStyle")=="Gay" then self:rainbowscroll(true) end end,
 		LoseFocusCommand=function(self) if ThemePrefs.Get("VisualStyle")=="Gay" then self:rainbowscroll(false) end end,

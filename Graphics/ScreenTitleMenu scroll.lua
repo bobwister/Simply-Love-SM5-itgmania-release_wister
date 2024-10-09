@@ -45,14 +45,16 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 
 	GainFocusCommand=function(self)
 		has_focus = true
-		self:stoptweening():zoom(0.5)
+		--self:stoptweening():zoom(0.5)
+		self:stoptweening():zoom(0.7)
 		self:accelerate(0.1):glow(1,1,1,0.5)
 		self:decelerate(0.05):glow(1,1,1,0)
 		self:playcommand("UpdateColor")
 	end,
 	LoseFocusCommand=function(self)
 		has_focus = false
-		self:stoptweening():zoom(0.4)
+		--self:stoptweening():zoom(0.4)
+		self:stoptweening():zoom(0.5)
 		self:accelerate(0.1):glow(1,1,1,0)
 		self:playcommand("UpdateColor")
 	end
