@@ -41,7 +41,7 @@ local af = Def.ActorFrame{
 			-- ensure that the first choice (no) will be active when the prompt overlay first appears
 			active_index = 0
 			-- make "no" the active_choice
-			choice_actors[0]:stoptweening():diffuse(PlayerColor(PLAYER_2)):zoom(1.1)
+			choice_actors[0]:stoptweening():diffuse(GetHexColor(SL.Global.ActiveColorIndex, true)):zoom(1.1)
 			-- ensure that "yes" is not the active_choice
 			choice_actors[1]:stoptweening():diffuse(1,1,1,1):zoom(0.5)
 
@@ -67,7 +67,7 @@ local af = Def.ActorFrame{
 		-- update active_index
 		active_index = (active_index + 1)%2
 		-- new active_choice gains focus
-		choice_actors[active_index]:diffuse(PlayerColor(PLAYER_2)):stoptweening():linear(0.1):zoom(1.1)
+		choice_actors[active_index]:diffuse(GetHexColor(SL.Global.ActiveColorIndex, true)):stoptweening():linear(0.1):zoom(1.1)
 		--play sound effect
 		sfx.change:play()
 	end,
@@ -129,7 +129,7 @@ local no = Def.ActorFrame{
 	InitCommand=function(self)
 		choice_actors[0] = self
 		self:x(THEME:GetMetric("ScreenPrompt","Answer1Of2X"))
-		self:y(250):diffuse( PlayerColor(PLAYER_2) )
+		self:y(250):diffuse( GetHexColor(SL.Global.ActiveColorIndex, true) )
 	end,
 
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
@@ -146,7 +146,7 @@ local yes = Def.ActorFrame{
 	InitCommand=function(self)
 		choice_actors[1] = self
 		self:x(THEME:GetMetric("ScreenPrompt","Answer2Of2X"))
-		self:y(250)
+		self:y(250):diffuse(GetHexColor(SL.Global.ActiveColorIndex, true))
 	end,
 
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
