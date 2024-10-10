@@ -50,7 +50,7 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 		self:accelerate(0.1):glow(1,1,1,0.5)
 		self:decelerate(0.05):glow(1,1,1,0)
 		self:playcommand("UpdateColor")
-		self:diffuse(GetHexColor(SL.Global.ActiveColorIndex, true))
+		self:diffuse(PlayerColor(PLAYER_1))
 	end,
 	LoseFocusCommand=function(self)
 		has_focus = false

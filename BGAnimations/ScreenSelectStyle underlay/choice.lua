@@ -53,7 +53,7 @@ local af = Def.ActorFrame{
 			--self:shadowlength(1):y(37):zoom(0.5)
 			self:shadowlength(1):y(37):zoom(0.8)
 		end,
-		GainFocusCommand=function(self) self:diffuse(GetHexColor(SL.Global.ActiveColorIndex, true)) if ThemePrefs.Get("VisualStyle")=="Gay" then self:rainbowscroll(true) end end,
+		GainFocusCommand=function(self) self:diffuse(PlayerColor(PLAYER_1)) if ThemePrefs.Get("VisualStyle")=="Gay" then self:rainbowscroll(true) end end,
 		LoseFocusCommand=function(self) self:diffuse({1.0, 1.0, 1.0, 1.0}) if ThemePrefs.Get("VisualStyle")=="Gay" then self:rainbowscroll(false) end end,
 	}
 }
