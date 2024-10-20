@@ -10,18 +10,18 @@ local af = Def.ActorFrame{
 	InitCommand=function(self) self:x(WideScale(28,33)) end,
 
 	Def.Quad{
-		InitCommand=function(self) 
-			self:horizalign(left):diffuse(color("#000000")):zoomto(item_width, _screen.h/num_visible_items)
+		InitCommand=function(self) --outline color of wheel folder items
+			self:horizalign(left):diffuse(Color.Black):zoomto(item_width, _screen.h/num_visible_items)
 			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				self:diffusealpha(0.5)
+				self:diffusealpha(1.0)
 			end
 		end
 	},
 	Def.Quad{
-		InitCommand=function(self) 
-			self:horizalign(left):diffuse(color("#4c565d")):zoomto(item_width, _screen.h/num_visible_items - 1)
+		InitCommand=function(self) --fill color of wheel folder items
+			self:horizalign(left):diffuse(Color.White):zoomto(item_width, _screen.h/num_visible_items - 1)
 			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				self:diffusealpha(0.5)
+				self:diffusealpha(0.1)
 			end
 		end
 	}

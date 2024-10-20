@@ -11,7 +11,7 @@ local af =  Def.ActorFrame{
 
 	Def.Quad{ InitCommand=function(self) self:horizalign(left):diffuse(0, 10/255, 17/255, 0.5):zoomto(item_width, _screen.h/num_visible_items) end },
 	Def.Quad{ InitCommand=function(self)
-		self:horizalign(left):diffuse(DarkUI() and {1,1,1,0.5} or {10/255, 20/255, 27/255, 1}):zoomto(item_width, (_screen.h/num_visible_items)-1)
+		self:horizalign(left):diffuse(DarkUI() and {1,1,1,0.5} or PlayerColor(PLAYER_1)):zoomto(item_width, (_screen.h/num_visible_items)-1)
 		if ThemePrefs.Get("VisualStyle") == "SRPG8" or ThemePrefs.Get("VisualStyle") == "Technique" then self:diffusealpha(0.5) end
 	end }
 }
