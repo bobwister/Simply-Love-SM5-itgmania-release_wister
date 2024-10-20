@@ -27,7 +27,7 @@ return Def.ActorFrame{
 		Name="HorizontalWhiteSwoosh",
 		InitCommand=function(self)
 			self:horizalign(center):vertalign(middle)
-				:diffuse( ThemePrefs.Get("RainbowMode") and Color.Black or Color.White )
+				:diffuse( ThemePrefs.Get("RainbowMode") and Color.Black  or Color.White )
 				:zoomto(_screen.w + 100,50):faderight(0.1):fadeleft(0.1):cropright(1)
 		end,
 		OnCommand=function(self)
@@ -45,7 +45,7 @@ return Def.ActorFrame{
 		Text=THEME:GetString("ScreenProfileLoad","Loading Profiles..."),
 		InitCommand=function(self)
 			--self:diffuse( ThemePrefs.Get("RainbowMode") and Color.White or Color.Black ):zoom(0.6)
-			self:diffuse( ThemePrefs.Get("RainbowMode") and Color.White or Color.Black ):zoom(0.7)
+			self:diffuse( ThemePrefs.Get("RainbowMode") and Color.White or PlayerColor(PLAYER_1) ):zoom(0.9)
 		end
 	}
 }
