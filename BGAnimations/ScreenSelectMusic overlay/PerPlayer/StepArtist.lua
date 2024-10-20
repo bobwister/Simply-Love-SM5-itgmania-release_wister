@@ -140,7 +140,7 @@ return Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=GAMESTATE:IsCourseMode() and Screen.String("SongNumber"):format(1) or Screen.String("STEPS"),
 		InitCommand=function(self)
-			self:diffuse(0,0,0,1):horizalign(left):x(30):maxwidth(40):zoom(0.8)
+			self:diffuse(0,0,0,1):horizalign(left):x(40):maxwidth(40):zoom(0.8)
 		end,
 		UpdateTrailTextMessageCommand=function(self, params)
 			self:settext( THEME:GetString("ScreenSelectCourse", "SongNumber"):format(params.index) )
@@ -152,9 +152,9 @@ return Def.ActorFrame{
 		InitCommand=function(self)
 			self:diffuse(color("#1e282f")):horizalign(left):zoom(0.8)
 			if GAMESTATE:IsCourseMode() then
-				self:x(60):maxwidth(138)
+				self:x(70):maxwidth(138)
 			else
-				self:x(70):diffuse(color("#000000"))
+				self:x(80):diffuse(color("#000000"))
 				if #GAMESTATE:GetHumanPlayers() == 1 then 
 					self:maxwidth(175)
 				else
@@ -180,7 +180,7 @@ return Def.ActorFrame{
 				-- to ensure it stays synced with the scrolling list of songs
 				if not GAMESTATE:IsCourseMode() then
 					-- only queue a Marquee if there are things in the text_table to display
-					self:x(70):diffuse(color("#000000"))
+					self:x(80):diffuse(color("#000000"))
 					if #GAMESTATE:GetHumanPlayers() == 1 then 
 						self:maxwidth(175)
 					else

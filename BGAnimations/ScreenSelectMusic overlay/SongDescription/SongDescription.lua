@@ -32,7 +32,7 @@ af[#af+1] = Def.Quad{
 
 -- ActorFrame for Artist, BPM, and Song length
 af[#af+1] = Def.ActorFrame{
-	InitCommand=function(self) self:xy(-110,-6) end,
+	InitCommand=function(self) self:xy(-100,-6) end,
 
 	-- ----------------------------------------
 	-- Artist Label
