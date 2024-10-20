@@ -11,7 +11,7 @@ t[#t+1] = Def.ActorFrame{
 
 		Def.ActorFrame{
 			OnCommand=function(self)
-				self:xy(SCREEN_CENTER_X - 440,SCREEN_CENTER_Y - 220)
+				self:xy(SCREEN_CENTER_X - SCREEN_WIDTH * 0.5,SCREEN_CENTER_Y - SCREEN_HEIGHT * 0.45)
 			end;
 				--smaller negative x goes to the right
 				--smaller negative y goes down
