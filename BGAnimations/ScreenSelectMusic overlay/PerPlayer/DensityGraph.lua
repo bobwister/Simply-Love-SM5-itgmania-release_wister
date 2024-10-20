@@ -369,7 +369,7 @@ local layout = {
 	{"Brackets", "Total Stream"},
 }
 
-local colSpacing = 150
+local colSpacing = 170
 local rowSpacing = 17
 
 for i, row in ipairs(layout) do
@@ -379,12 +379,12 @@ for i, row in ipairs(layout) do
 			Name=col .. "Value",
 			InitCommand=function(self)
 				local textHeight = 17
-				local textZoom = 0.7
+				local textZoom = 0.85
 				self:zoom(textZoom):horizalign(right)
 				if col == "Total Stream" then
 					self:maxwidth(100)
 				end
-				self:xy(-width/2 + 40, -height/2 + 10)
+				self:xy(-width/2 + 26, -height/2 + 10)
 				self:addx((j-1)*colSpacing)
 				self:addy((i-1)*rowSpacing)
 			end,
@@ -415,9 +415,9 @@ for i, row in ipairs(layout) do
 			Name=col,
 			InitCommand=function(self)
 				local textHeight = 17
-				local textZoom = 0.8
+				local textZoom = 0.9
 				self:maxwidth(width/textZoom):zoom(textZoom):horizalign(left)
-				self:xy(-width/2 + 50, -height/2 + 10)
+				self:xy(-width/2 + 30, -height/2 + 10)
 				self:addx((j-1)*colSpacing)
 				self:addy((i-1)*rowSpacing)
 			end,
