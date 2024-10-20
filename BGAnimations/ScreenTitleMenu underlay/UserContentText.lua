@@ -54,7 +54,7 @@ local text = ("%s%s\n%s\n%s"):format(
 return LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 	Text=text,
 	InitCommand=function(self)
-		self:zoom(0.8):y(-150):diffusealpha(0)
+		self:zoom(1.0):y(-150):diffusealpha(0)
 		self:playcommand("UpdateColor")
 	end,
 	OnCommand=function(self) self:sleep(0.2):linear(0.4):diffusealpha(1) end,

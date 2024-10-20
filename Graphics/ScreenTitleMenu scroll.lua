@@ -8,7 +8,7 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 	Name="Choice"..index,
 	Text=THEME:GetString( 'ScreenTitleMenu', Var("GameCommand"):GetText() ),
 
-	InitCommand=function(self) self:shadowlength(0.5) end,
+	InitCommand=function(self) self:shadowlength(0.5):y(-12 + index*4) end,
 	OnCommand=function(self) self:diffusealpha(0):sleep(index*0.075):linear(0.2):diffusealpha(1) end,
 	OffCommand=function(self)
 		-- if the first TitleMenu choice (Gameplay) was chosen by the player
@@ -46,7 +46,7 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 	GainFocusCommand=function(self)
 		has_focus = true
 		--self:stoptweening():zoom(0.5)
-		self:stoptweening():zoom(0.7)
+		self:stoptweening():zoom(0.8)
 		self:accelerate(0.1):glow(1,1,1,0.5)
 		self:decelerate(0.05):glow(1,1,1,0)
 		self:playcommand("UpdateColor")
@@ -55,7 +55,7 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 	LoseFocusCommand=function(self)
 		has_focus = false
 		--self:stoptweening():zoom(0.4)
-		self:stoptweening():zoom(0.5)
+		self:stoptweening():zoom(0.6)
 		self:accelerate(0.1):glow(1,1,1,0)
 		self:playcommand("UpdateColor")
 		self:diffuse({1.0, 1.0, 1.0, 1.0})
