@@ -71,11 +71,11 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 		if playerStats and score then
 		
 			if playerStats and playerStats.showex then
-				self:zoom(0.38):horizalign(align1):x(col1x):y(-12)
+				self:zoom(0.5):horizalign(align1):x(col1x):y(-12)
 			else
 				self:horizalign(align1):x(col1x)
 				if playerStats and playerStats.judgments.W0 then
-					self:zoom(0.48):y(-32)
+					self:zoom(0.5):y(-32)
 				else
 					self:zoom(0.5):y(-24)
 				end
@@ -100,7 +100,7 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 
 --ex score
 af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
-	InitCommand=function(self) self:zoom(0.38):horizalign(align1):x(col1x):y(-12) end,
+	InitCommand=function(self) self:zoom(0.5):horizalign(align1):x(col1x):y(-12) end,
 	DrawStageCommand=function(self)
 		if playerStats and playerStats.judgments and playerStats.judgments.W0 then
 			self:settext(("%.2f"):format(playerStats.exscore)):diffuse(Colors[1])
@@ -109,9 +109,9 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 		end
 		
 		if playerStats and playerStats.showex then
-			self:zoom(0.48):y(-32):horizalign(align1):x(col1x)
+			self:zoom(0.5):y(-32):horizalign(align1):x(col1x)
 		else
-			self:zoom(0.38):horizalign(align1):x(col1x):y(-12)
+			self:zoom(0.5):horizalign(align1):x(col1x):y(-12)
 		end
 	end
 }
@@ -122,7 +122,7 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 	InitCommand=function(self)
 		self:y(17)
 		self:x(col1x + (player==PLAYER_1 and -1 or 1))
-		self:horizalign(align1):zoom(0.65)
+		self:horizalign(align1):zoom(0.75)
 	end,
 	DrawStageCommand=function(self)
 		if playerStats==nil then self:settext(""); return end
@@ -149,12 +149,12 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 
 -- difficulty meter
 af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
-	InitCommand=function(self) self:zoom(0.4):horizalign(align1):x(col1x):y(-1) end,
+	InitCommand=function(self) self:zoom(0.5):horizalign(align1):x(col1x):y(-1) end,
 	DrawStageCommand=function(self)
 		if playerStats and meter then
 			self:diffuse(DifficultyColor(difficulty)):settext(meter)
 			if playerStats.judgments and playerStats.judgments.W0 then
-				self:zoom(0.3):y(5)
+				self:zoom(0.4):y(5)
 			end
 		else
 			self:settext("")
@@ -164,7 +164,7 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 
 -- stepartist
 af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	InitCommand=function(self) self:zoom(0.65):horizalign(align1):x(col1x):y(32) end,
+	InitCommand=function(self) self:zoom(0.75):horizalign(align1):x(col1x):y(32) end,
 	DrawStageCommand=function(self)
 		if playerStats and stepartist then
 			self:settext(stepartist)
@@ -199,15 +199,15 @@ for i=1,#TNSTypes do
 
 	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 		InitCommand=function(self)
-			self:zoom(0.28):horizalign(align2):x(col2x):y(i*13 - 50)
+			self:zoom(0.50):horizalign(align2):x(col2x):y(i*13 - 50)
 				:diffuse( Colors[i] )
 		end,
 		DrawStageCommand=function(self, params)
 			if playerStats and playerStats.judgments then
 				if playerStats.judgments.W0 then
-					self:zoom(0.28):horizalign(align2):x(col2x):y(i*13 - 58):diffuse( Colors[i] )
+					self:zoom(0.50):horizalign(align2):x(col2x):y(i*13 - 58):diffuse( Colors[i] )
 				else
-					self:zoom(0.28):horizalign(align2):x(col2x):y(i*13 - 63):diffuse( Colors[i] )
+					self:zoom(0.50):horizalign(align2):x(col2x):y(i*13 - 63):diffuse( Colors[i] )
 					if i == 2 then
 						self:diffuse( Colors[1] )
 					end
