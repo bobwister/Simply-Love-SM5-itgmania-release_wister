@@ -5,10 +5,12 @@ end
 
 local Players = GAMESTATE:GetHumanPlayers()
 local holdingCtrl = false
+local holdingSelect = false
 
 local RestartHandler = function(event)
 	if not event then return end
 
+--cltr+r = restart song
 	if event.type == "InputEventType_FirstPress" then
 		if event.DeviceInput.button == "DeviceButton_left ctrl" then
 			holdingCtrl = true
@@ -23,6 +25,7 @@ local RestartHandler = function(event)
 		end
 	end
 	
+--select+start = restart song
 	if event.type == "InputEventType_FirstPress" then
 		if event.GameButton == "Select" then
 			holdingSelect = true
