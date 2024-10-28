@@ -87,9 +87,10 @@ local histogram_amv = Scrolling_NPS_Histogram(player, width, height)..{
 -- PeakNPS text
 local text = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 	InitCommand=function(self)
-		self:zoom(0.5)
+		self:zoom(0.6)
 		self:halign( PlayerNumber:Reverse()[OtherPlayer[player]] )
 		self:vertalign(bottom)
+		self:diffusealpha(0.7)
 
 		-- flip alignment if ultrawide and both players joined because the pane
 		-- will now appear on the player's side of the screen rather than opposite
@@ -124,7 +125,7 @@ local text = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 			end
 		end
 
-		self:y( -self:GetHeight()/2 + 5 )
+		self:y( -self:GetHeight()/2 )
 		self:settext( ("%s/%s: %g/%g"):format(THEME:GetString("ScreenGameplay", "PeakNPS"),THEME:GetString("ScreenGameplay", "eBPM"), round(my_peak * SL.Global.ActiveModifiers.MusicRate,2),round(my_peak *15* SL.Global.ActiveModifiers.MusicRate,0)) )
 		self:maxwidth(190)
 	end,
