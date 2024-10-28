@@ -85,7 +85,7 @@ local t = Def.ActorFrame{
 
 t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 	Name="MachineRecord",
-	InitCommand=function(self) self:xy(-110,-18):diffuse(PlayerColor(player)) end,
+	InitCommand=function(self) self:xy(-50,-18):diffuse(PlayerColor(player)) end,
 	OnCommand=function(self)
 		if EarnedMachineRecord and HighScoreIndex.Machine+1 > 0 then
 			self:settext(ScreenString("MachineRecord"):format(HighScoreIndex.Machine+1))
@@ -95,7 +95,7 @@ t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 
 t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 	Name="PersonalRecord",
-	InitCommand=function(self) self:xy(-110,24):diffuse(PlayerColor(player)) end,
+	InitCommand=function(self) self:xy(-50,24):diffuse(PlayerColor(player)) end,
 	OnCommand=function(self)
 		if EarnedPersonalRecord and HighScoreIndex.Personal+1 > 0 then
 			self:settext(ScreenString("PersonalRecord"):format(HighScoreIndex.Personal+1))
