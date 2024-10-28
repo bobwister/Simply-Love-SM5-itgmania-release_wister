@@ -124,11 +124,11 @@ pane[#pane+1] = Def.BitmapText{
 	Text=ScreenString("Early"),
 	InitCommand=function(self)
 		self:addx(10):addy(-125)
-			:zoom(0.3)
+			:zoom(0.5)
 			:horizalign(left)
-		if ThemePrefs.Get("VisualStyle") == "Technique" then
-			self:diffusealpha(0.5)
-		end
+		--if ThemePrefs.Get("VisualStyle") == "Technique" then
+		--	self:diffusealpha(0.5)
+		--end
 	end,
 }
 
@@ -138,7 +138,7 @@ pane[#pane+1] = Def.BitmapText{
 	Text=ScreenString("Late"),
 	InitCommand=function(self)
 		self:addx(pane_width-10):addy(-125)
-			:zoom(0.3)
+			:zoom(0.5)
 			:horizalign(right)
 	end,
 }
@@ -167,7 +167,7 @@ pane[#pane+1] = Def.BitmapText{
 
 		self:diffuse( colors[1] )
 			:addx(x):addy(7)
-			:zoom(0.65)
+			:zoom(0.8)
 	end,
 }
 
@@ -189,7 +189,7 @@ for i=2,num_judgments_available do
 
 			self:diffuse( colors[i] )
 				:addx(x_avg):addy(7)
-				:zoom(0.65)
+				:zoom(0.8)
 			-- Hide the text if it's the same as the previous window.
 			if abbreviations[SL.Global.GameMode][i] == abbreviations[SL.Global.GameMode][i-1] then
 				self:visible(false)
@@ -211,7 +211,7 @@ for i=2,num_judgments_available do
 
 			self:diffuse( colors[i] )
 				:addx(x_avg):addy(7)
-				:zoom(0.65)
+				:zoom(0.8)
 			-- Hide the text if it's the same as the previous window.
 			if abbreviations[SL.Global.GameMode][i] == abbreviations[SL.Global.GameMode][i-1] then
 				self:visible(false)
@@ -270,8 +270,8 @@ if next(offsets) ~= nil then
 end
 
 local label = {}
-label.y = -pane_height+20
-label.zoom = 0.575
+label.y = -pane_height+19
+label.zoom = 0.7
 label.padding = 3
 
 -- Cleanly positioning the labels for "mean timing error", "median", and "mode"

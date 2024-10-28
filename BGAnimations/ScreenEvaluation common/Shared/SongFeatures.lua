@@ -16,7 +16,7 @@ return Def.ActorFrame{
 
 	-- text for BPM (and maybe music rate if ~= 1.0)
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:zoom(0.6):maxwidth(418/0.875) end,
+		InitCommand=function(self) self:zoom(0.8):maxwidth(418/0.875) end,
 		OnCommand=function(self)
 			-- FIXME: the current layout of ScreenEvaluation doesn't accommodate split BPMs
 			--        so this currently uses the MasterPlayer's BPM values
@@ -34,7 +34,7 @@ return Def.ActorFrame{
 
 	-- text for Song Length
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:zoom(0.6):maxwidth(418/0.875):x(145):horizalign("right") end,
+		InitCommand=function(self) self:zoom(0.8):maxwidth(418/0.875):x(145):horizalign("right") end,
 		OnCommand=function(self)
 			local seconds = nil
 			if GAMESTATE:IsCourseMode() then
@@ -65,7 +65,7 @@ return Def.ActorFrame{
 	-- text for Artist
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		InitCommand=function(self)
-			self:zoom(0.6):maxwidth(418/2.3):x(-145):horizalign("left")
+			self:zoom(0.8):maxwidth(418/2.3):x(-145):horizalign("left")
 			if SL.Global.ActiveModifiers.MusicRate ~= 1 then
 				self:maxwidth(418/3.5)
 			end

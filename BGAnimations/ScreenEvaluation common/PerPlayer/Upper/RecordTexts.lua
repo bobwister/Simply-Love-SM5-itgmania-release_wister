@@ -76,10 +76,10 @@ end
 -- We always want to return this actor frame in case we need to "hijack" it for GrooveStats functionality.
 local t = Def.ActorFrame{
 	Name="RecordTexts",
-	InitCommand=function(self) self:zoom(0.225) end,
+	InitCommand=function(self) self:zoom(0.455) end,
 	OnCommand=function(self)
 		self:x( player == PLAYER_1 and -45 or 95 )
-		self:y( 54 )
+		self:y( 50 )
 	end
 }
 
