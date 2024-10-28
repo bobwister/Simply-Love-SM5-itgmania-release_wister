@@ -31,7 +31,7 @@ return Def.ActorFrame{
 		Name="Percent",
 		Text=percent,
 		InitCommand=function(self)
-			self:horizalign(right):zoom(0.95)
+			self:horizalign(right):zoom(1.3)
 			self:x( (controller == PLAYER_1 and 1.5 or 141))
 		end
 	}

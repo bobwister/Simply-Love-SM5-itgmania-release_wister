@@ -118,7 +118,7 @@ for index, RCType in ipairs(RadarCategories.Types) do
 			Name="Percent",
 			Text=("%.2f"):format(percent),
 			InitCommand=function(self)
-				self:horizalign(right):zoom(0.65)
+				self:horizalign(right):zoom(1.3)
 				self:x( ((controller == PLAYER_1) and -114) or 286 )
 				self:y(47)
 				
