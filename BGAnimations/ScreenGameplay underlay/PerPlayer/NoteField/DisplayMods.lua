@@ -6,10 +6,10 @@ local optionslist = GetPlayerOptionsString(player)
 
 local af = Def.ActorFrame{
   InitCommand = function(self)
-    self:diffusealpha(1):xy(GetNotefieldX(player), SCREEN_HEIGHT/4*1.3)
+    self:diffusealpha(0.7):xy(GetNotefieldX(player), SCREEN_HEIGHT/4*1.3)
   end,
   OnCommand=function(self)
-    self:sleep(5):decelerate(0.5):diffusealpha(0)
+    self:sleep(1.5):decelerate(1.0):diffusealpha(0)
   end,
   PlayerOptionsChangedMessageCommand=function(self, params)
     if params.Player ~= player then return false end
