@@ -1,6 +1,6 @@
 local t = LoadFallbackB();
 
-if not GAMESTATE:IsCourseMode() then
+if not GAMESTATE:IsCourseMode() and not GAMESTATE:IsEventMode() then
 	t[#t+1] = StandardDecorationFromFileOptional("StageDisplay","StageDisplay");
 end
 
