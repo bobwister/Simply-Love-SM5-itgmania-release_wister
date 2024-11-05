@@ -56,7 +56,7 @@ SelectMusicOrCourse = function()
 end
 
 Branch.AllowScreenSelectProfile = function()
-	if ThemePrefs.Get("AllowScreenSelectProfile") and GAMESTATE:GetCoinMode() ~= "CoinMode_Pay" then
+	if ThemePrefs.Get("AllowScreenSelectProfile") and (GAMESTATE:GetCoinMode() ~= "CoinMode_Pay" or PREFSMAN:GetPreference("EventMode")) then
 		return "ScreenSelectProfile"
 	else
 		return Branch.AllowScreenSelectColor()
@@ -64,7 +64,7 @@ Branch.AllowScreenSelectProfile = function()
 end
 
 Branch.AllowScreenSelectColor = function()
-	if ThemePrefs.Get("AllowScreenSelectColor") and not ThemePrefs.Get("RainbowMode") and GAMESTATE:GetCoinMode() ~= "CoinMode_Pay" then
+	if ThemePrefs.Get("AllowScreenSelectColor") and not ThemePrefs.Get("RainbowMode") and (GAMESTATE:GetCoinMode() ~= "CoinMode_Pay" or PREFSMAN:GetPreference("EventMode")) then
 		return "ScreenSelectColor"
 	else
 		return Branch.AfterScreenSelectColor()
