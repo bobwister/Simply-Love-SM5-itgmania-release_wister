@@ -108,7 +108,7 @@ bmt.InitCommand=function(self)
 end
 
 bmt.JudgmentMessageCommand=function(self, params)
-	if player == params.Player and not mods.ShowEXScore and (mods.TargetScore ~= "Ghost Data" or (mods.TargetScore == "Ghost Data" and not ghostdata)) then
+	if player == params.Player and not mods.ShowEXScore and (mods.MiniIndicator ~= "Ghost Data" or (mods.MiniIndicator == "Ghost Data" and not ghostdata)) then
 		tns = ToEnumShortString(params.TapNoteScore)
 		hns = params.HoldNoteScore and ToEnumShortString(params.HoldNoteScore)
 		self:queuecommand("SetScore")
@@ -117,7 +117,7 @@ end
 
 
 bmt.ExCountsChangedMessageCommand=function(self, params)
-	if player == params.Player and mods.ShowEXScore  and (mods.TargetScore ~= "Ghost Data" or (mods.TargetScore == "Ghost Data" and not ghostdata)) then
+	if player == params.Player and mods.ShowEXScore  and (mods.MiniIndicator ~= "Ghost Data" or (mods.MiniIndicator == "Ghost Data" and not ghostdata)) then
 		local possible_ex_score, current_possible = GetPossibleExScore(params.ExCounts)
 
 		local total_possible = params.actual_possible
@@ -279,7 +279,7 @@ bmt.SetScoreCommand=function(self, params)
 		local score = current_possible_dp - actual_dp
 		score = math.floor(((possible_dp - score) / possible_dp) * 10000) / 100
 
-		if mods.TargetScore ~= "Ghost Data" or (mods.TargetScore == "Ghost Data" and not ghostdata) then
+		if mods.MiniIndicator ~= "Ghost Data" or (mods.MiniIndicator == "Ghost Data" and not ghostdata) then
 			-- specify percent away from 100%
 			if mods.MiniIndicator == "SubtractiveScoring" then
 				if mods.MiniIndicatorColor == "Default" then

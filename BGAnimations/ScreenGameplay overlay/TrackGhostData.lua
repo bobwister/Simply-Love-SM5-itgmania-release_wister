@@ -55,7 +55,7 @@ local a, b, possibleex
 
 return Def.Actor{
 	OnCommand=function(self)
-		if mods.TargetScore == "Ghost Data" then	
+		if mods.MiniIndicator == "Ghost Data" then	
 			a,b,possibleex = CalculateExScore(player)
 			local profile_slot = {
 				[PLAYER_1] = "ProfileSlot_Player1",
@@ -141,7 +141,7 @@ return Def.Actor{
 		end
 
 		-- If the user is doing Ghost Data, also calculate pace against ghost because we're already doing the calculations here
-		if mods.TargetScore == "Ghost Data" and ghostdata then
+		if mods.MiniIndicator == "Ghost Data" and ghostdata then
 			if mods.ShowEXScore then
 				currentScore = currentdp_ex
 				TargetScore = ghost[#ex]

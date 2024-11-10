@@ -591,7 +591,7 @@ local Overrides = {
 	},
 	-------------------------------------------------------------------------
 	TargetScore = {
-		Values = { "SpecifiedValue", "Machine best", "Personal best", "Ghost Data" }
+		Values = { "SpecifiedValue", "Machine best", "Personal best" }
 	},
 	-------------------------------------------------------------------------
 	TargetScoreNumber = {
@@ -609,7 +609,7 @@ local Overrides = {
 	},
 	-------------------------------------------------------------------------
 	MiniIndicator = {
-		Values = { "None", "SubtractiveScoring", "PredictiveScoring", "PaceScoring", "RivalScoring", "Pacemaker", "StreamProg" },
+		Values = { "None", "SubtractiveScoring", "PredictiveScoring", "PaceScoring", "RivalScoring", "Pacemaker", "StreamProg", "Ghost Data" },
 	},
 	-------------------------------------------------------------------------
 	MiniIndicatorColor = {
