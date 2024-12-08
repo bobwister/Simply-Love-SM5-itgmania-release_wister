@@ -50,13 +50,13 @@ if IsSpooky() then
 end
 
 -- the best way to spread holiday cheer is singing loud for all to hear
-if HolidayCheer() then
-	af2[#af2+1] = Def.Sprite{
-		Texture=THEME:GetPathB("ScreenTitleMenu", "underlay/hat.png"),
-		InitCommand=function(self) self:zoom(0.225):xy( 130, -self:GetHeight()/2 ):rotationz(15):queuecommand("Drop") end,
-		DropCommand=function(self) self:decelerate(1.333):y(-110) end,
-	}
-end
+--if HolidayCheer() then
+--	af2[#af2+1] = Def.Sprite{
+--		Texture=THEME:GetPathB("ScreenTitleMenu", "underlay/hat.png"),
+--		InitCommand=function(self) self:zoom(0.225):xy( 130, -self:GetHeight()/2 ):rotationz(15):queuecommand("Drop") end,
+--		DropCommand=function(self) self:decelerate(1.333):y(-110) end,
+--	}
+--end
 
 -- ensure that af2 is added as a child of af
 af[#af+1] = af2
