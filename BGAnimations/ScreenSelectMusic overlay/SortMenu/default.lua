@@ -320,10 +320,8 @@ local t = Def.ActorFrame {
 		end
 
 		if not GAMESTATE:IsCourseMode() then
-			if ThemePrefs.Get("KeyboardFeatures") then
-				-- Only display this option if keyboard features are enabled
-				table.insert(wheel_options, {"WhereforeArtThou", "SongSearch"})
-			end
+			-- Only display this option if keyboard features are enabled
+			table.insert(wheel_options, {"WhereforeArtThou", "SongSearch"})
 		end
 
 		if ThemePrefs.Get("AllowScreenSelectProfile") then
@@ -334,6 +332,10 @@ local t = Def.ActorFrame {
 			table.insert(wheel_options, {"ImLovinIt", "AddFavorite"})
 		end
 
+		if GAMESTATE:IsEventMode() and GAMESTATE:GetCurrentSong() ~= nil then
+			table.insert(wheel_options, {"HardTime", "PracticeMode"})
+		end
+		
 		for player in ivalues(GAMESTATE:GetHumanPlayers()) do
 			local path = getFavoritesPath(player)
 			if FILEMAN:DoesFileExist(path) then
