@@ -6,20 +6,20 @@ local RecentMods = function(mods)
 
 	local text = ""
 
-	-- SpeedModType should be a string and SpeedMod should be a number
-	if type(mods.SpeedModType)=="string" and type(mods.SpeedMod)=="number" then
-		-- for ScreenSelectProfile, allow either "x" or "X" to be in the player's profile for SpeedModType
-		if (mods.SpeedModType):upper()=="X" and mods.SpeedMod > 0 then
-			-- take whatever number is in the player's profile, string format it to 2 decimal places
-			-- convert back to a number to remove potential trailing 0s (we want "1.5x" not "1.50x")
-			-- and finally convert that back to a string
-			text = ("%gx"):format(tonumber(("%.2f"):format(mods.SpeedMod)))
-
-		elseif (mods.SpeedModType=="M" or mods.SpeedModType=="C") and mods.SpeedMod > 0 then
-			text = ("%s%.0f"):format(mods.SpeedModType, mods.SpeedMod)
-		end
-	end
-
+	-- -- SpeedModType should be a string and SpeedMod should be a number
+	-- if type(mods.SpeedModType)=="string" and type(mods.SpeedMod)=="number" then
+	-- 	-- for ScreenSelectProfile, allow either "x" or "X" to be in the player's profile for SpeedModType
+	-- 	if (mods.SpeedModType):upper()=="X" and mods.SpeedMod > 0 then
+	-- 		-- take whatever number is in the player's profile, string format it to 2 decimal places
+	-- 		-- convert back to a number to remove potential trailing 0s (we want "1.5x" not "1.50x")
+	-- 		-- and finally convert that back to a string
+	-- 		text = ("%gx"):format(tonumber(("%.2f"):format(mods.SpeedMod)))
+	-- 
+	-- 	elseif (mods.SpeedModType=="M" or mods.SpeedModType=="C") and mods.SpeedMod > 0 then
+	-- 		text = ("%s%.0f"):format(mods.SpeedModType, mods.SpeedMod)
+	-- 	end
+	-- end
+	-- 
 	-- -----------------------------------------------------------------------
 	-- the NoteSkin and JudgmentGraphic previews are not text, and are loaded, handled, and positioned separately
 
@@ -34,34 +34,34 @@ local RecentMods = function(mods)
 	-- would be nice but that can wait for a future release.
 	-- -----------------------------------------------------------------------
 
-	-- Mini should definitely be a string
-	if type(mods.Mini)=="string" and mods.Mini ~= "" then text = ("%s %s, "):format(mods.Mini, THEME:GetString("OptionTitles", "Mini")) end
-
-	-- DataVisualizations should be a string and a specific string at that
-	if mods.DataVisualizations=="Target Score Graph" or mods.DataVisualizations=="Step Statistics" then
-		text = text .. THEME:GetString("SLPlayerOptions", mods.DataVisualizations)..", "
-	end
-
-	-- loop for mods that save as booleans
-	local flags, hideflags = "", ""
-	for k,v in pairs(mods) do
-		-- explicitly check for true (not Lua truthiness)
-		if v == true then
-			-- gsub() returns two values:
-			-- the string resulting from the substitution, and the number of times the substitution occurred (0, 1, 2, 3, ...)
-			-- custom modifier strings in SL should have "Hide" occur as a substring 0 or 1 times
-			local mod, hide = k:gsub("Hide", "")
-
-			if THEME:HasString("SLPlayerOptions", mod) then
-				if hide == 0 then
-					flags = flags..THEME:GetString("SLPlayerOptions", mod)..", "
-				elseif hide == 1 then
-					hideflags = hideflags..THEME:GetString("ThemePrefs", "Hide").." "..THEME:GetString("SLPlayerOptions", mod)..", "
-				end
-			end
-		end
-	end
-	text = text .. hideflags .. flags
+	-- -- Mini should definitely be a string
+	-- if type(mods.Mini)=="string" and mods.Mini ~= "" then text = ("%s %s, "):format(mods.Mini, THEME:GetString("OptionTitles", "Mini")) end
+	-- 
+	-- -- DataVisualizations should be a string and a specific string at that
+	-- if mods.DataVisualizations=="Target Score Graph" or mods.DataVisualizations=="Step Statistics" then
+	-- 	text = text .. THEME:GetString("SLPlayerOptions", mods.DataVisualizations)..", "
+	-- end
+	-- 
+	-- -- loop for mods that save as booleans
+	-- local flags, hideflags = "", ""
+	-- for k,v in pairs(mods) do
+	-- 	-- explicitly check for true (not Lua truthiness)
+	-- 	if v == true then
+	-- 		-- gsub() returns two values:
+	-- 		-- the string resulting from the substitution, and the number of times the substitution occurred (0, 1, 2, 3, ...)
+	-- 		-- custom modifier strings in SL should have "Hide" occur as a substring 0 or 1 times
+	-- 		local mod, hide = k:gsub("Hide", "")
+	-- 
+	-- 		if THEME:HasString("SLPlayerOptions", mod) then
+	-- 			if hide == 0 then
+	-- 				flags = flags..THEME:GetString("SLPlayerOptions", mod)..", "
+	-- 			elseif hide == 1 then
+	-- 				hideflags = hideflags..THEME:GetString("ThemePrefs", "Hide").." "..THEME:GetString("SLPlayerOptions", mod)..", "
+	-- 			end
+	-- 		end
+	-- 	end
+	-- end
+	-- text = text .. hideflags .. flags
 
 	-- remove trailing comma and whitespace
 	text = text:sub(1,-3)
