@@ -559,7 +559,7 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 	Name="P1SubmitText",
 	Text="",
 	InitCommand=function(self)
-		self:xy(_screen.w * 0.25, _screen.h - 15)
+		self:xy(_screen.w * 0.35, _screen.h - 15)
 		self:diffuse(textColor)
 		self:shadowlength(shadowLength)
 		self:zoom(0.8)
@@ -602,7 +602,7 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 	Name="P2SubmitText",
 	Text="",
 	InitCommand=function(self)
-		self:xy(_screen.w * 0.75, _screen.h - 15)
+		self:xy(_screen.w * 0.65, _screen.h - 15)
 		self:diffuse(textColor)
 		self:shadowlength(shadowLength)
 		self:zoom(0.8)
