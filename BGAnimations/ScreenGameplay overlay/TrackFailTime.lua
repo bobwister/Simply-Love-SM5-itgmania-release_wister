@@ -98,7 +98,7 @@ local af = Def.Actor{
 			if GAMESTATE:IsCourseMode() then 
 				local cumulativeSeconds = CourseLengthPerSong(player)
 				local courseIndex = GAMESTATE:GetCourseSongIndex()
-				local totalSecondsToEndOfSong = cumulativeSeconds[courseIndex+1]
+				local totalSecondsToEndOfSong = cumulativeSeconds[courseIndex+1] or 0
 
 				graphPercentage = deathSecond / totalSecondsToEndOfSong
 				graphLabel = deathSecond / totalSeconds
