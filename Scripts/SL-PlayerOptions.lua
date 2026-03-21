@@ -609,7 +609,7 @@ local Overrides = {
 	},
 	-------------------------------------------------------------------------
 	MiniIndicator = {
-		Values = { "None", "SubtractiveScoring", "PredictiveScoring", "PaceScoring", "RivalScoring", "Pacemaker", "StreamProg", "Ghost Data" },
+		Values = { "None", "SubtractiveScoring", "PredictiveScoring", "PaceScoring", "RivalScoring", "Pacemaker", "StreamProg"},
 	},
 	-------------------------------------------------------------------------
 	MiniIndicatorColor = {
