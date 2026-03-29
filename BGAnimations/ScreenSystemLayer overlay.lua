@@ -11,8 +11,6 @@ local t = Def.ActorFrame{
 	end
 }
 
--- -----------------------------------------------------------------------
-
 local function CreditsText( player )
 	return LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal") .. {
 		InitCommand=function(self)
@@ -554,6 +552,13 @@ t[#t+1] = Def.ActorFrame{
 -- -----------------------------------------------------------------------
 -- Loads the UnlocksCache from disk for SRPG unlocks.
 LoadUnlocksCache()
+
+-- -----------------------------------------------------------------------
+-- Online Lobby Handler
+-- We only want one global instance of this, so we create it once but
+-- can get the same instance of the actor multiple times.
+
+t[#t+1] = CreateOnlineHandler()
 
 -- -----------------------------------------------------------------------
 -- SystemMessage stuff.

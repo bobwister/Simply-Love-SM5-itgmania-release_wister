@@ -9,6 +9,10 @@ local input = function(event)
 	local screen   = SCREENMAN:GetTopScreen()
 	local overlay  = screen:GetChild("Overlay")
 	local sortmenu = overlay:GetChild("SortMenu")
+	if SCREENMAN:GetTopScreen():GetMusicWheel():IsLocked() then
+		overlay:queuecommand("DirectInputToEngine")
+	end
+	
 	if event.type ~= "InputEventType_Release" then
 		if event.GameButton == "MenuRight" or event.GameButton == "MenuDown" then
 			sort_wheel:scroll_by_amount(1)
@@ -85,9 +89,22 @@ local input = function(event)
 					overlay:GetChild("PaneDisplayMaster"):GetChild("GetScoresRequester"):playcommand("Cancel")
 					overlay:playcommand("DirectInputToEngine")
 					SCREENMAN:SetNewScreen("ScreenViewDownloads")
+				elseif focus.new_overlay == "OnlineLobbies" then
+					overlay:queuecommand("DirectInputToEngine")
+					SCREENMAN:SetNewScreen("ScreenOnlineLobbies")
 				elseif focus.new_overlay == "SwitchProfile" then
-					SL.Global.FastProfileSwitchInProgress = true
+					-- There's a race condition that occurs when a player mashes the Start button
+					-- fast enough, when the Switch Profiles button is highlighted, that causes
+					-- two SelectProfile screens to be present. This softlocks the game
+					-- due to the first screen not able to receive inputs.
+					if SL.Global.FastProfileSwitchInProgress then return false end
 
+					SL.Global.FastProfileSwitchInProgress = true
+					-- If a memory card is inserted we can't be on that profile's songs when switching profiles
+					-- as the profile is temporarily unloaded when finishing the screen.
+					if MEMCARDMAN:GetCardState(PLAYER_1) ~= 'MemoryCardState_none' or MEMCARDMAN:GetCardState(PLAYER_2) ~= 'MemoryCardState_none' then
+						SCREENMAN:GetTopScreen():GetMusicWheel():SetOpenSection("");
+					end
 					-- Make sure we save any currently active profiles before potentially switching
 					-- to different ones.
 					GAMESTATE:SaveProfiles()

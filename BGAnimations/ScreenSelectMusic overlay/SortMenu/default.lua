@@ -318,6 +318,13 @@ local t = Def.ActorFrame {
 				table.insert(wheel_options, {"GrooveStats", "Leaderboard"})
 			end
 		end
+		
+		-- Online lobby
+		if ThemePrefs.Get("EnableOnlineLobbies") and GAMESTATE:IsEventMode() then
+			if GAMESTATE:GetCurrentSong() then
+				table.insert(wheel_options, {"BottomText", "OnlineLobbies"})
+			end
+		end
 
 		if not GAMESTATE:IsCourseMode() then
 			-- Only display this option if keyboard features are enabled
