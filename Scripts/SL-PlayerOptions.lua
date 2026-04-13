@@ -419,7 +419,7 @@ local Overrides = {
 				return { "ShowFaPlusWindow" }
 			end
 
-			return { "ShowFaPlusWindow", "ShowExScore", "ShowHardEXScore", "ShowFaPlusPane", "SmallerWhite" }
+			return { "ShowFaPlusWindow", "ShowEXScore", "ShowHardEXScore", "ShowFaPlusPane", "SmallerWhite" }
 		end,
 		LoadSelections = function(self, list, pn)
 			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
@@ -429,7 +429,7 @@ local Overrides = {
 			end
 
 			list[1] = mods.ShowFaPlusWindow or false
-			list[2] = mods.ShowExScore or false
+			list[2] = mods.ShowEXScore or false
 			list[3] = mods.ShowHardEXScore or false
 			list[4] = mods.ShowFaPlusPane or false
 			list[5] = mods.SmallerWhite or false
@@ -441,7 +441,7 @@ local Overrides = {
 
 			if ThemePrefs.Get("EnableTournamentMode") then
 				mods.ShowFaPlusWindow = list[1]
-				mods.ShowExScore = ThemePrefs.Get("ScoringSystem") == "EX"
+				mods.ShowEXScore = ThemePrefs.Get("ScoringSystem") == "EX"
 				mods.ShowFaPlusPane = true
 				mods.SmallerWhite = false
 				-- Default to FA+ pane in Tournament Mode
@@ -450,7 +450,7 @@ local Overrides = {
 			end
 
 			mods.ShowFaPlusWindow = list[1]
-			mods.ShowExScore = list[2]
+			mods.ShowEXScore = list[2]
 			mods.ShowHardEXScore = list[3]
 			mods.ShowFaPlusPane = list[4]
 			mods.SmallerWhite = list[5]
@@ -532,7 +532,7 @@ local Overrides = {
 	-------------------------------------------------------------------------
 	ScoreBoxOptions = {
 		SelectType = "SelectMultiple",
-		Values = { "SBITGScore", "SBExScore", "SBEvents" },
+		Values = { "SBITGScore", "SBEXScore", "SBEvents" },
 	},
 	-------------------------------------------------------------------------
 	StepStatsExtra = {
