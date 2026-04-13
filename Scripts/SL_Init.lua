@@ -246,7 +246,8 @@ SL = {
 			color("#66c955"),	-- green
 			color("#b45cff"),	-- purple (greatly lightened)
 			color("#c9855e"),	-- peach?
-			color("#ff3030")	-- red (slightly lightened)
+			color("#ff3030"),	-- red (slightly lightened)
+			color("#ff00cc")	-- pink (hard ex)
 		},
 		ITG = {
 			color("#21CCE8"),	-- blue

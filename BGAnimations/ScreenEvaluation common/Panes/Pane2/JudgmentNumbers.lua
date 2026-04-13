@@ -6,13 +6,13 @@ local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(player)
 local TapNoteScores = {
 	Types = { 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'Miss' },
 	Colors = {
-		SL.JudgmentColors["FA+"][1],
-		SL.JudgmentColors["FA+"][2],
-		SL.JudgmentColors["FA+"][3],
-		SL.JudgmentColors["FA+"][4],
-		SL.JudgmentColors["FA+"][5],
-		SL.JudgmentColors["ITG"][5], -- FA+ mode doesn't have a Way Off window. Extract color from the ITG mode.
-		SL.JudgmentColors["FA+"][6],
+		SL.JudgmentColors["ITG"][1], -- Fantastic Blue
+		SL.JudgmentColors["FA+"][2], -- Just extract the Fantastic white color
+        SL.JudgmentColors["ITG"][2], -- Yellow Excellent
+		SL.JudgmentColors["ITG"][3], -- Green Great
+		SL.JudgmentColors["ITG"][4], -- Purple Decent
+		SL.JudgmentColors["ITG"][5], -- Way Off
+		SL.JudgmentColors["ITG"][6], -- Red Miss
 	},
 	-- x values for P1 and P2
 	x = { P1=64, P2=94 }
@@ -102,9 +102,21 @@ end
 
 -- then handle hands/ex, holds, mines, rolls
 for index, RCType in ipairs(RadarCategories.Types) do
-	-- Swap to displaying ITG score if we're showing EX score in gameplay.
+  -- Behavior
+	-- If ShowEXScore and not ShowHardEXScore - show ITG score in white 
+	-- If ShowEXScore and ShowHardEXScore - marquee between white ITG score and pink H.EX score
+	-- else show EX score in (judgment window color)
 	local percent = nil
-	if SL[pn].ActiveModifiers.ShowEXScore then
+	local percentHardEX = nil
+
+	if SL[pn].ActiveModifiers.ShowEXScore and SL[pn].ActiveModifiers.ShowHardEXScore then
+		local PercentDP = pss:GetPercentDancePoints()
+		percent = FormatPercentScore(PercentDP):gsub("%%", "")
+		-- Format the Percentage string, removing the % symbol
+		percent = tonumber(percent)
+
+		percentHardEX = CalculateHardExScore(player, counts)
+	elseif SL[pn].ActiveModifiers.ShowEXScore then
 		local PercentDP = pss:GetPercentDancePoints()
 		percent = FormatPercentScore(PercentDP):gsub("%%", "")
 		-- Format the Percentage string, removing the % symbol
@@ -114,6 +126,8 @@ for index, RCType in ipairs(RadarCategories.Types) do
 	end
 
 	if index == 1 then
+    local showHardEX = true
+
 		t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 			Name="Percent",
 			Text=("%.2f"):format(percent),
@@ -127,7 +141,25 @@ for index, RCType in ipairs(RadarCategories.Types) do
 				else
 					self:diffuse( SL.JudgmentColors[SL.Global.GameMode][1] )
 				end
-			end
+			end,
+			BeginCommand=function(self)
+				self:playcommand("Marquee")
+			end,
+      MarqueeCommand=function(self)
+			if not SL[pn].ActiveModifiers.ShowHardEXScore or not SL[pn].ActiveModifiers.ShowEXScore then
+					return
+				end
+			if showHardEX then
+				self:settext(("%.2f"):format(percentHardEX))
+					self:diffuse(color("#FF00CC"))
+				showHardEX = false
+				else
+					self:settext(("%.2f"):format(percent))
+					self:diffuse(Color.White)
+				showHardEX = true
+				end
+				self:sleep(2):queuecommand("Marquee")
+      end
 		}
 	end
 

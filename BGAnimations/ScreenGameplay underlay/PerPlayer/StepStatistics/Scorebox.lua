@@ -575,7 +575,11 @@ for i=1,NumEntries do
 			local clr = Color.White
 			if score.isFail then
 				clr = Color.Red
+			elseif cur_style == 6 then
+				-- HardEX pane: render scores in pink
+				clr = SL.JudgmentColors["FA+"][7]
 			elseif score.isEx then
+				-- EX scoring (non-HardEX) in red
 				clr = SL.JudgmentColors["FA+"][1]
 			elseif score.isSelf then
 				clr = self_color
