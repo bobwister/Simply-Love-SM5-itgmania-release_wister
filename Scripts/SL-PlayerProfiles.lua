@@ -86,7 +86,8 @@ local permitted_profile_settings = {
 	ErrorBarCap    		 = "number",
 
 	ShowFaPlusWindow     = "boolean",
-	ShowEXScore          = "boolean",
+	ShowExScore          = "boolean",
+	ShowHardEXScore      = "boolean",
 	ShowFaPlusPane       = "boolean",
 	SmallerWhite     = "boolean",
 
@@ -98,7 +99,7 @@ local permitted_profile_settings = {
 	DisplayScorebox      = "boolean",
 	
 	SBITGScore           = "boolean",
-	SBEXScore            = "boolean",
+	SBExScore            = "boolean",
 	SBEvents             = "boolean",
 	
 	FlashMiss            = "boolean",
