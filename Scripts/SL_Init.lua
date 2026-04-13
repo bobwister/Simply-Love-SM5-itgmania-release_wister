@@ -54,6 +54,7 @@ local PlayerDefaults = {
 				TimingWindows = {true, true, true, true, true},
 				ShowFaPlusWindow = false,
 				ShowEXScore = false,
+				ShowHardEXScore = false,
 				ShowFaPlusPane = true,
 				
 				RainbowMax = false,
@@ -247,7 +248,6 @@ SL = {
 			color("#b45cff"),	-- purple (greatly lightened)
 			color("#c9855e"),	-- peach?
 			color("#ff3030"),	-- red (slightly lightened)
-			color("#ff00cc")	-- pink (hard ex)
 		},
 		ITG = {
 			color("#21CCE8"),	-- blue
@@ -263,7 +263,8 @@ SL = {
 			color("#e29c18"),	-- gold
 			color("#66c955"),	-- green
 			color("#b45cff"),	-- purple (greatly lightened)
-			color("#ff3030")	-- red (slightly lightened)
+			color("#ff3030"),	-- red (slightly lightened)
+			color("#ff00cc")	-- pink (hard ex)
 		},
 	},
 	Preferences = {
@@ -463,6 +464,18 @@ SL = {
 		W1=3,
 		W2=2,
 		W3=1,
+		W4=0,
+		W5=0,
+		Miss=0,
+		LetGo=0,
+		Held=1,
+		HitMine=-1
+	},
+	HardExWeights = {
+		W010=3.5,
+		W110=3,
+		W2=1,
+		W3=0,
 		W4=0,
 		W5=0,
 		Miss=0,

@@ -857,7 +857,7 @@ for i=1,NumEntries do
 				-- HardEX pane: render scores in pink
 				clr = SL.JudgmentColors["FA+"][7]
 			elseif score.isEx then
-				-- EX scoring (non-HardEX) in red
+				-- EX scoring (non-HardEX) in blue
 				clr = SL.JudgmentColors["FA+"][1]
 			elseif score.isSelf then
 				clr = self_color
