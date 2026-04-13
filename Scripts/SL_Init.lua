@@ -78,7 +78,6 @@ local PlayerDefaults = {
 				ComboMode = "FullCombo",
 				TimerMode = "Time",
 				JudgmentAnimation = "Default",
-				RailBalance = "No",
 
 				NoteFieldOffsetX = 0,
 				NoteFieldOffsetY = 0,

@@ -114,7 +114,6 @@ local permitted_profile_settings = {
 	ComboMode			 = "string",
 	TimerMode            = "string",
 	JudgmentAnimation    = "string",
-	RailBalance          = "string",
 	
 	JudgmentBack         = "boolean",
 	ErrorMSDisplay       = "boolean",
