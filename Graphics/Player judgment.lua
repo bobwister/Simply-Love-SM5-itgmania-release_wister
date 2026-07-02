@@ -179,16 +179,6 @@ return Def.ActorFrame{
 				local direction = param.TapNoteOffset < 0 and -1 or 1
 				sprite:rotationz(direction * offset)
 			end
-			if SL[ToEnumShortString(player)].ActiveModifiers.RailBalance == "What" then
-				-- How much to rotate.
-				-- We cap it at 50ms (15px) since anything after likely to be too distracting.
-				local extraOffset = (math.abs(param.TapNoteOffset) > capTimingOffset and math.abs(param.TapNoteOffset) - capTimingOffset or 0) * 300 * mods.TiltMultiplier
-				local offset = math.min(math.abs(param.TapNoteOffset), capTimingOffset) * 300 * mods.TiltMultiplier
-				offset = math.min(offset + math.sqrt(extraOffset), 180)
-				-- Which direction to rotate.
-				local direction = param.TapNoteOffset < 0 and -1 or 1
-				SCREENMAN:GetTopScreen():GetChild("Player"..ToEnumShortString(player)):GetChild("NoteField"):rotationz(direction * offset)
-			end
 			
 			if mods.JudgmentAnimation == 'Default' then
 				-- this should match the custom JudgmentTween() from SL for 3.95
@@ -310,17 +300,6 @@ return Def.ActorFrame{
 				sprite:rotationz(0)
 				spriteGhost:rotationz(0)
 			end
-		end
-		
-		if SL[ToEnumShortString(player)].ActiveModifiers.RailBalance == "What" then
-			-- How much to rotate.
-			-- We cap it at 50ms (15px) since anything after likely to be too distracting.
-			local extraOffset = (math.abs(param.TapNoteOffset) > capTimingOffset and math.abs(param.TapNoteOffset) - capTimingOffset or 0) * 300 * mods.TiltMultiplier
-			local offset = math.min(math.abs(param.TapNoteOffset), capTimingOffset) * 300 * mods.TiltMultiplier
-			offset = math.min(offset + math.sqrt(extraOffset), 180)
-			-- Which direction to rotate.
-			local direction = param.TapNoteOffset < 0 and -1 or 1
-			SCREENMAN:GetTopScreen():GetChild("Player"..ToEnumShortString(player)):GetChild("NoteField"):rotationz(direction * offset)
 		end
 		
 		if mods.JudgmentAnimation == 'Default' then
