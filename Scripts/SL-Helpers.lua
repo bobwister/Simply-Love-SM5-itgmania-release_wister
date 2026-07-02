@@ -1031,3 +1031,131 @@ GetPlayerOptionsString = function(player, modsLevel)
 
 	return optionslist
 end
+
+-- -----------------------------------------------------------------------
+-- Adjusts a player's active speedmod (XMod/MMod/CMod) up or down by a
+-- fixed step, clamped to sane bounds, and applies it immediately.
+local SpeedModIncrement  = { X = 0.05, M = 5,    C = 5 }
+local SpeedModUpperLimit = { X = 10,   M = 2000, C = 2000 }
+local SpeedModFormat     = { X = "mod,%.2fx", M = "mod,m%d", C = "mod,c%d" }
+
+-- Given the CURRENT speedmod type/value, computes the stepped/clamped new
+-- value, applies it to the player immediately, and broadcasts the change.
+-- speedmod_type is "X", "M", or "C".
+local ApplySteppedSpeedMod = function(player, speedmod_type, speedmod, direction)
+	if speedmod_type == nil or speedmod == nil then return end
+	if SpeedModIncrement[speedmod_type] == nil then return end
+
+	if direction == "up" then
+		if speedmod + SpeedModIncrement[speedmod_type] <= SpeedModUpperLimit[speedmod_type] then
+			speedmod = speedmod + SpeedModIncrement[speedmod_type]
+		end
+	else
+		if speedmod - SpeedModIncrement[speedmod_type] > 0 then
+			speedmod = speedmod - SpeedModIncrement[speedmod_type]
+		end
+	end
+
+	-- update SL table with new speed, same as SL-PlayerOptions.lua's MenuLeft/MenuRight handler
+	SL[ToEnumShortString(player)].ActiveModifiers.SpeedMod = speedmod
+
+	-- format a GameCommand string like "mod,1.75x" or "mod,c460" or "mod,m900"
+	local gcString = SpeedModFormat[speedmod_type]:format(speedmod)
+
+	-- apply the new speed mod to the player immediately
+	GAMESTATE:ApplyGameCommand(gcString, player)
+
+	-- broadcast which player's mods changed so that DisplayMods.lua (ScreenGameplay) and
+	-- MusicWheel highlight.lua (ScreenSelectMusic) can refresh their displayed text
+	MESSAGEMAN:Broadcast("PlayerOptionsChanged", {Player=player})
+end
+
+-- Reads the current speedmod from the engine's PlayerOptions for the given
+-- modslevel. Authoritative during gameplay, where song-level mods (which
+-- can differ from the player's general preference) are what's live.
+AdjustSpeedMod = function(player, direction, modslevel)
+	local playeroptions = GAMESTATE:GetPlayerState(player):GetPlayerOptions(modslevel)
+	if playeroptions == nil then return end
+
+	local xmod = playeroptions:XMod()
+	local mmod = playeroptions:MMod()
+	local cmod = playeroptions:CMod()
+
+	local speedmod      = (cmod ~= nil and cmod) or (mmod ~= nil and mmod) or (xmod ~= nil and xmod)
+	local speedmod_type = (cmod ~= nil and "C")  or (mmod ~= nil and "M")  or (xmod ~= nil and "X")
+
+	ApplySteppedSpeedMod(player, speedmod_type, speedmod, direction)
+end
+
+-- Reads the current speedmod from the SL display table instead of the
+-- engine. Authoritative on ScreenSelectMusic: the engine's
+-- ModsLevel_Preferred PlayerOptions object isn't guaranteed to be synced
+-- with what's displayed until the player has visited ScreenPlayerOptions
+-- or ApplyMods() has run, so reading it directly can pick up a stale
+-- value. The SL table is always what's actually shown to the player.
+AdjustSpeedModFromDisplay = function(player, direction)
+	local mods = SL[ToEnumShortString(player)].ActiveModifiers
+	ApplySteppedSpeedMod(player, mods.SpeedModType, mods.SpeedMod, direction)
+end
+
+-- -----------------------------------------------------------------------
+-- Builds an AddInputCallback-compatible input handler that lets players
+-- nudge their active speedmod up/down via:
+--   - keyboard: ctrl+Up / ctrl+Down, applied to every human player
+--   - arcade:   Select(Back)+MenuUp / Select(Back)+MenuDown, applied only
+--               to the player holding Select
+-- Pass a modslevel (e.g. 'ModsLevel_Song') to read from the engine; pass
+-- nil to read from the SL display table instead (see AdjustSpeedModFromDisplay).
+SpeedModHotkeyInputHandler = function(modslevel)
+	local holdingCtrl = false
+	local holdingSelect = {}
+
+	local Adjust = function(player, direction)
+		if modslevel then
+			AdjustSpeedMod(player, direction, modslevel)
+		else
+			AdjustSpeedModFromDisplay(player, direction)
+		end
+	end
+
+	return function(event)
+		if not event then return false end
+
+		if event.DeviceInput and event.DeviceInput.button == "DeviceButton_left ctrl" then
+			holdingCtrl = (event.type ~= "InputEventType_Release")
+			return false
+		end
+
+		if event.GameButton == "Select" then
+			if event.PlayerNumber then
+				holdingSelect[event.PlayerNumber] = (event.type ~= "InputEventType_Release")
+			end
+			return false
+		end
+
+		if event.type ~= "InputEventType_FirstPress" then return false end
+
+		if holdingCtrl and event.DeviceInput then
+			local direction
+			if event.DeviceInput.button == "DeviceButton_up" then direction = "up"
+			elseif event.DeviceInput.button == "DeviceButton_down" then direction = "down" end
+
+			if direction then
+				for player in ivalues(GAMESTATE:GetHumanPlayers()) do
+					Adjust(player, direction)
+				end
+				return false
+			end
+		end
+
+		if event.PlayerNumber and holdingSelect[event.PlayerNumber] then
+			if event.GameButton == "MenuUp" then
+				Adjust(event.PlayerNumber, "up")
+			elseif event.GameButton == "MenuDown" then
+				Adjust(event.PlayerNumber, "down")
+			end
+		end
+
+		return false
+	end
+end

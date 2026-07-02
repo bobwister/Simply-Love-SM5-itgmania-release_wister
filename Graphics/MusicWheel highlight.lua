@@ -28,6 +28,10 @@ for player in ivalues(GAMESTATE:GetHumanPlayers()) do
 				self:zoom(0.5)
 				self:settext( ("%s%s"):format(SL[pn].ActiveModifiers.SpeedModType, SL[pn].ActiveModifiers.SpeedMod) )
 			end,
+			PlayerOptionsChangedMessageCommand=function(self, params)
+				if params.Player ~= player then return false end
+				self:settext( ("%s%s"):format(SL[pn].ActiveModifiers.SpeedModType, SL[pn].ActiveModifiers.SpeedMod) )
+			end,
 		}
 	end
 		

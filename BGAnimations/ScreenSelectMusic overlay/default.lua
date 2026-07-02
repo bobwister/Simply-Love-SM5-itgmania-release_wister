@@ -78,6 +78,9 @@ local af = Def.ActorFrame{
 	LoadActor("./EscapeFromEventMode.lua"),
 
 	LoadActor("./SongSearch/default.lua"),
+
+	-- ctrl+Up/Down or Select+MenuUp/Down live speedmod adjustment
+	LoadActor("./SpeedModHotkey.lua"),
 }
 
 return af
