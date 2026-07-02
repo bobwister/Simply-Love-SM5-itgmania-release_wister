@@ -827,6 +827,33 @@ CalculateExScore = function(player, ex_counts, use_actual_w0_weight)
 end
 
 -- -----------------------------------------------------------------------
+-- Calculate the "Super EX" score for a player: identical to the EX score
+-- but using the stricter 10ms Fantastic+ window instead of 15ms.
+--
+-- The ex_counts tracked in BGAnimations/ScreenGameplay overlay/TrackExScoreJudgments.lua
+-- already contain:
+--   W010 -> Fantastics hit within 10ms (the Super EX "Fantastic+")
+--   W110 -> every other Fantastic-window hit (>10ms, up to the W1 window)
+-- so we remap W0<-W010 and W1<-W110 and reuse CalculateExScore's weighting.
+CalculateSuperExScore = function(player, ex_counts)
+	if SL.Global.GameMode == "Casual" then return 0 end
+
+	local counts = ex_counts or SL[ToEnumShortString(player)].Stages.Stats[SL.Global.Stages.PlayedThisGame + 1].ex_counts
+	if counts == nil then return 0 end
+
+	-- shallow copy so we don't mutate the caller's table
+	local remapped = {}
+	for k, v in pairs(counts) do remapped[k] = v end
+
+	-- strict 10ms window: only <=10ms Fantastics stay Fantastic+ (W0);
+	-- the remaining Fantastic-window hits fall back to regular Fantastic (W1)
+	remapped.W0 = counts.W010 or 0
+	remapped.W1 = counts.W110 or 0
+
+	return CalculateExScore(player, remapped)
+end
+
+-- -----------------------------------------------------------------------
 -- Generates the column mapping in case of any turn mods.
 -- Returns a table containing the column swaps.
 -- Returns nil if we can't compute it

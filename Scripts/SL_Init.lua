@@ -55,7 +55,9 @@ local PlayerDefaults = {
 				ShowFaPlusWindow = false,
 				ShowEXScore = false,
 				ShowFaPlusPane = true,
-				
+				PrimaryScore = "ITGScore",
+				SecondaryScore = "None",
+
 				RainbowMax = false,
 				ResponsiveColors = false,
 				ShowLifePercent = false,

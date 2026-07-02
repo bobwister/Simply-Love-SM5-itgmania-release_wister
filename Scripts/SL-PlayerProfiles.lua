@@ -89,6 +89,8 @@ local permitted_profile_settings = {
 	ShowEXScore          = "boolean",
 	ShowFaPlusPane       = "boolean",
 	SmallerWhite     = "boolean",
+	PrimaryScore         = "string",
+	SecondaryScore       = "string",
 
 	HideEarlyDecentWayOffJudgments = "boolean",
 	HideEarlyDecentWayOffFlash     = "boolean",

@@ -440,14 +440,18 @@ local Overrides = {
 			-- 1. Still allow the player to toggle the FA+ window during gameplay in Tournament Mode since
 			--    some might find it distracting. We should still display it in step stats if it's enabled
 			--    though.
-			-- 2. EX score/ITG score is forced in Tournament Mode so remove the option.
-			-- 3. FA Plus Pane should always be shown in Tournament Mode to prevent issues with
+			-- 2. FA Plus Pane should always be shown in Tournament Mode to prevent issues with
 			--    potentially crucial information.
+			-- Note: EX/ITG score choice now lives in the Primary/Secondary Score Display rows.
 			if ThemePrefs.Get("EnableTournamentMode") then
 				return { "ShowFaPlusWindow" }
 			end
 
-			return { "ShowFaPlusWindow", "ShowEXScore", "ShowFaPlusPane", "SmallerWhite" }
+			if SL.Global.GameMode == "FA+" then
+				return { "SmallerWhite" }
+			end
+
+			return { "ShowFaPlusWindow", "ShowFaPlusPane", "SmallerWhite" }
 		end,
 		LoadSelections = function(self, list, pn)
 			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
@@ -457,15 +461,13 @@ local Overrides = {
 			end
 
 			if SL.Global.GameMode == "FA+" then
-				list[1] = mods.ShowEXScore or false
-				list[2] = mods.SmallerWhite or false
+				list[1] = mods.SmallerWhite or false
 				return list
-			end		
+			end
 
 			list[1] = mods.ShowFaPlusWindow or false
-			list[2] = mods.ShowEXScore or false
-			list[3] = mods.ShowFaPlusPane or false
-			list[4] = mods.SmallerWhite or false
+			list[2] = mods.ShowFaPlusPane or false
+			list[3] = mods.SmallerWhite or false
 			return list
 		end,
 		SaveSelections = function(self, list, pn)
@@ -474,7 +476,6 @@ local Overrides = {
 
 			if ThemePrefs.Get("EnableTournamentMode") then
 				mods.ShowFaPlusWindow = list[1]
-				mods.ShowEXScore = ThemePrefs.Get("ScoringSystem") == "EX"
 				mods.ShowFaPlusPane = true
 				mods.SmallerWhite = false
 				-- Default to FA+ pane in Tournament Mode
@@ -483,21 +484,62 @@ local Overrides = {
 			end
 
 			if SL.Global.GameMode == "FA+" then
-				-- always disable in FA+ mode since it's handled engine side.
+				-- FA+ window/pane are handled engine side in FA+ GameMode.
 				mods.ShowFaPlusWindow = false
-				mods.ShowEXScore = list[1]
-				-- mods.ShowFaPlusPane = list[3]
-				mods.SmallerWhite = list[2]
+				mods.SmallerWhite = list[1]
 				return
 			end
 
 			mods.ShowFaPlusWindow = list[1]
-			mods.ShowEXScore = list[2]
-			mods.ShowFaPlusPane = list[3]
-			mods.SmallerWhite = list[4]
-			-- Default to FA+ pane if either options are active.
-			sl_pn.EvalPanePrimary = ((list[1] or list[2]) and list[3]) and 2 or 1
+			mods.ShowFaPlusPane = list[2]
+			mods.SmallerWhite = list[3]
+			-- Default eval pane to FA+ pane when the FA+ window or EX score is shown and the pane is on.
+			-- ShowEXScore is derived by the Primary/Secondary Score Display rows; recompute here too so
+			-- this stays correct regardless of the order SaveSelections runs across rows.
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
 		end
+	},
+	-------------------------------------------------------------------------
+	PrimaryScoreDisplay = {
+		Values = { "ITGScore", "EXScore", "SuperEXScore" },
+		LoadSelections = function(self, list, pn)
+			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
+			local choice = mods.PrimaryScore or "ITGScore"
+			local i = FindInTable(choice, self.Values) or 1
+			list[i] = true
+			return list
+		end,
+		SaveSelections = function(self, list, pn)
+			local sl_pn = SL[ToEnumShortString(pn)]
+			local mods = sl_pn.ActiveModifiers
+			for i, val in ipairs(self.Values) do
+				if list[i] then mods.PrimaryScore = val; break end
+			end
+			-- ShowEXScore drives all downstream EX behavior (evaluation, target, submission).
+			-- True only when the actual EX score (not Super EX) is shown in either slot.
+			mods.ShowEXScore = (mods.PrimaryScore == "EXScore") or (mods.SecondaryScore == "EXScore")
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
+		end,
+	},
+	-------------------------------------------------------------------------
+	SecondaryScoreDisplay = {
+		Values = { "ITGScore", "EXScore", "SuperEXScore", "None" },
+		LoadSelections = function(self, list, pn)
+			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
+			local choice = mods.SecondaryScore or "None"
+			local i = FindInTable(choice, self.Values) or 4
+			list[i] = true
+			return list
+		end,
+		SaveSelections = function(self, list, pn)
+			local sl_pn = SL[ToEnumShortString(pn)]
+			local mods = sl_pn.ActiveModifiers
+			for i, val in ipairs(self.Values) do
+				if list[i] then mods.SecondaryScore = val; break end
+			end
+			mods.ShowEXScore = (mods.PrimaryScore == "EXScore") or (mods.SecondaryScore == "EXScore")
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
+		end,
 	},
 	-------------------------------------------------------------------------
 	Hide = {
