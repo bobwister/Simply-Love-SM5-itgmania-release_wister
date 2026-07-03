@@ -3,6 +3,10 @@ local player, controller = unpack(...)
 local pn = ToEnumShortString(player)
 local stats = STATSMAN:GetCurStageStats():GetPlayerStageStats(pn)
 
+-- H.EX (10ms) label marquee support (see the index==1 block below)
+local HEX_COLOR = color("#FF4FCB")
+local show10 = true
+
 local firstToUpper = function(str)
     return (str:gsub("^%l", string.upper))
 end
@@ -128,13 +132,15 @@ end
 -- labels: hands/ex, holds, mines, rolls
 for index, label in ipairs(RadarCategories) do
 	if index == 1 then
-		text = nil
+		local text, label_diffuse, marquee
 		if SL[pn].ActiveModifiers.ShowEXScore then
 			text = "ITG"
+			label_diffuse = Color.White
 		else
 			text = "EX"
+			label_diffuse = SL.JudgmentColors[SL.Global.GameMode][1]
+			marquee = SL[pn].ActiveModifiers.SmallerWhite or false
 		end
-
 
 		t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small"
 							or ThemePrefs.Get("ThemeFont") == "Mega" and "Mega/_mega font"
@@ -142,14 +148,20 @@ for index, label in ipairs(RadarCategories) do
 			Text=text,
 			InitCommand=function(self) self:zoom(0.5):horizalign(right) end,
 			BeginCommand=function(self)
-				self:x( (controller == PLAYER_1 and -160) or 90 )
+				self:x( (controller == PLAYER_1 and -145) or 95 )
 				self:y(38)
-
-				if SL[pn].ActiveModifiers.ShowEXScore then
-					self:diffuse(Color.White)
+				self:diffuse(label_diffuse)
+				if marquee then self:playcommand("Marquee") end
+			end,
+			MarqueeCommand=function(self)
+				if show10 then
+					self:settext("H. EX"):diffuse(HEX_COLOR)
+					show10 = false
 				else
-					self:diffuse( SL.JudgmentColors[SL.Global.GameMode][1] )
+					self:settext("EX"):diffuse(label_diffuse)
+					show10 = true
 				end
+				self:sleep(2):queuecommand("Marquee")
 			end
 		}
 	end

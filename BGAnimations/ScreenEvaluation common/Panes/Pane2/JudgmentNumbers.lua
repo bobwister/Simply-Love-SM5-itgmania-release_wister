@@ -3,6 +3,10 @@ local player, controller = unpack(...)
 local pn = ToEnumShortString(player)
 local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(player)
 
+-- H.EX (10ms) score marquee support (see the index==1 block below)
+local HEX_COLOR = color("#FF4FCB")
+local show10 = true
+
 local TapNoteScores = {
 	Types = { 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'Miss' },
 	Colors = {
@@ -103,31 +107,49 @@ end
 -- then handle hands/ex, holds, mines, rolls
 for index, RCType in ipairs(RadarCategories.Types) do
 	-- Swap to displaying ITG score if we're showing EX score in gameplay.
-	local percent = nil
-	if SL[pn].ActiveModifiers.ShowEXScore then
-		local PercentDP = pss:GetPercentDancePoints()
-		percent = FormatPercentScore(PercentDP):gsub("%%", "")
-		-- Format the Percentage string, removing the % symbol
-		percent = tonumber(percent)
-	else
-		percent = CalculateExScore(player, counts)
-	end
-
 	if index == 1 then
+		local score_percent, score_diffuse
+		local ex_percent, hex_percent, marquee
+
+		if SL[pn].ActiveModifiers.ShowEXScore then
+			-- EX is the big score (Percentage.lua); show ITG% here.
+			local PercentDP = pss:GetPercentDancePoints()
+			-- note: gsub returns (string, count); assign to a local first so
+			-- tonumber() doesn't receive the count as its (out-of-range) base arg
+			local PercentStr = FormatPercentScore(PercentDP):gsub("%%", "")
+			score_percent = tonumber(PercentStr)
+			score_diffuse = Color.White
+		else
+			-- EX is the breakdown score; support EX <-> H.EX marquee when SmallerWhite is on.
+			ex_percent  = CalculateExScore(player, counts)
+			hex_percent = CalculateSuperExScore(player, counts)
+			score_percent = ex_percent
+			score_diffuse = SL.JudgmentColors[SL.Global.GameMode][1]
+			marquee = SL[pn].ActiveModifiers.SmallerWhite or false
+		end
+
 		t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
 			Name="Percent",
-			Text=("%.2f"):format(percent),
+			Text=("%.2f"):format(score_percent),
 			InitCommand=function(self)
 				self:horizalign(right):zoom(1.3)
 				self:x( ((controller == PLAYER_1) and -114) or 286 )
 				self:y(47)
-				
-				if SL[pn].ActiveModifiers.ShowEXScore then
-					self:diffuse(Color.White)
+				self:diffuse(score_diffuse)
+			end,
+			BeginCommand=function(self)
+				if marquee then self:playcommand("Marquee") end
+			end,
+			MarqueeCommand=function(self)
+				if show10 then
+					self:settext(("%.2f"):format(hex_percent)):diffuse(HEX_COLOR)
+					show10 = false
 				else
-					self:diffuse( SL.JudgmentColors[SL.Global.GameMode][1] )
+					self:settext(("%.2f"):format(ex_percent)):diffuse(score_diffuse)
+					show10 = true
 				end
-			end
+				self:sleep(2):queuecommand("Marquee")
+			end,
 		}
 	end
 

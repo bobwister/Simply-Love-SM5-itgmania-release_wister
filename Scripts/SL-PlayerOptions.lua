@@ -500,7 +500,7 @@ local Overrides = {
 		end
 	},
 	-------------------------------------------------------------------------
-	PrimaryScoreDisplay = {
+	PrimaryScore = {
 		Values = { "ITGScore", "EXScore", "SuperEXScore" },
 		LoadSelections = function(self, list, pn)
 			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
@@ -522,7 +522,7 @@ local Overrides = {
 		end,
 	},
 	-------------------------------------------------------------------------
-	SecondaryScoreDisplay = {
+	SecondaryScore = {
 		Values = { "ITGScore", "EXScore", "SuperEXScore", "None" },
 		LoadSelections = function(self, list, pn)
 			local mods = SL[ToEnumShortString(pn)].ActiveModifiers
