@@ -1186,3 +1186,91 @@ SpeedModHotkeyInputHandler = function(modslevel)
 		return false
 	end
 end
+
+-- ----------------------------------------------------------------------------
+-- ResyncSongOffsetFromMean(player)
+--
+-- Rewrites the current song's #OFFSET so the player's systematic timing bias
+-- (their signed mean judgment offset) is cancelled out, mirroring the engine's
+-- autosync math:  new_offset = old_offset - mean_seconds  (mean positive = late).
+--
+-- Reads the mean from the offsets collected during gameplay (Pane 5 uses the same
+-- source), edits the song's loaded .ssc/.sm file in place, then reloads the song
+-- so the change is live in memory (an immediate Ctrl+R replay uses the new sync).
+--
+-- Returns a result table on success:
+--   { old=<sec>, new=<sec>, delta=<sec>, mean_ms=<signed, +late>, direction }
+-- Returns (nil, reason) on failure, reason one of:
+--   "no-data", "no-song", "read-failed", "no-offset-tag", "write-failed"
+ResyncSongOffsetFromMean = function(player)
+	local pn = ToEnumShortString(player)
+
+	-- 1. signed mean of this stage's judgment offsets (seconds; positive = late)
+	local stage = SL[pn].Stages.Stats[SL.Global.Stages.PlayedThisGame + 1]
+	local sequential_offsets = stage and stage.sequential_offsets
+	if not sequential_offsets then return nil, "no-data" end
+
+	local sum, count = 0, 0
+	for t in ivalues(sequential_offsets) do
+		local val = t[2]
+		if val ~= "Miss" then
+			sum = sum + val
+			count = count + 1
+		end
+	end
+	if count == 0 then return nil, "no-data" end
+	local mean_seconds = sum / count
+
+	-- 2. locate the song file the engine actually loaded (.ssc has priority)
+	local song = GAMESTATE:GetCurrentSong()
+	if not song then return nil, "no-song" end
+	local path = song:GetSongFilePath()
+	if not path or path == "" then return nil, "no-song" end
+
+	-- 3. read the whole file (read mode = 1), same idiom as SL-ChartParser.lua
+	local rf = RageFileUtil.CreateRageFile()
+	local contents
+	if rf:Open(path, 1) then
+		contents = rf:Read()
+	end
+	rf:destroy()
+	if not contents or contents == "" then return nil, "read-failed" end
+
+	-- 4. parse the first (song-level) #OFFSET tag
+	local old_str = contents:match("#OFFSET:%s*(-?%d*%.?%d+)%s*;")
+	if not old_str then return nil, "no-offset-tag" end
+	local old = tonumber(old_str)
+	if not old then return nil, "no-offset-tag" end
+
+	-- 5. compensate the bias
+	local new = old - mean_seconds
+	local replacement = ("#OFFSET:%.6f;"):format(new)
+
+	-- 6. replace only the first #OFFSET occurrence. Use a function replacement so
+	-- the formatted value is inserted literally (no gsub %-escaping surprises).
+	local new_contents = contents:gsub("#OFFSET:%s*-?%d*%.?%d+%s*;", function() return replacement end, 1)
+
+	-- 7. write it back (write mode = 2 truncates on open)
+	local wf = RageFileUtil.CreateRageFile()
+	local wrote = false
+	if wf:Open(path, 2) then
+		wf:Write(new_contents)
+		wf:Flush()
+		wrote = true
+	end
+	wf:destroy()
+	if not wrote then return nil, "write-failed" end
+
+	-- 8. reload the song so the new sync is live in memory
+	song:ReloadFromSongDir()
+
+	-- 9. result
+	local delta = new - old
+	return {
+		old = old,
+		new = new,
+		delta = delta,
+		mean_ms = mean_seconds * 1000,
+		direction = (delta < 0) and "later" or "earlier",
+	}
+end

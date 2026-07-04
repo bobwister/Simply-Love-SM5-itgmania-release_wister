@@ -51,6 +51,9 @@ t[#t+1] = LoadActor("./Shared/ScreenshotHandler.lua")
 -- code for immediately retrying the song that was just played
 t[#t+1] = LoadActor("./Shared/RestartHandler.lua")
 
+-- code for resyncing the song's #OFFSET to the solo player's mean timing (Ctrl+Shift+R)
+t[#t+1] = LoadActor("./Shared/ResyncHandler.lua")
+
 -- song background
 t[#t+1] = LoadActor("./Shared/Background.lua")
 
