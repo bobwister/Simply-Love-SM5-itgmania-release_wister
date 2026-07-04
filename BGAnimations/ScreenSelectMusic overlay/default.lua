@@ -41,6 +41,10 @@ local af = Def.ActorFrame{
 	-- Apply player modifiers from profile
 	LoadActor("./PlayerModifiers.lua"),
 
+	-- On-demand global ITL leaderboard ranks for visible wheel rows (sequential,
+	-- debounced, cached, 429-backoff). Inert unless solo + GrooveStats + api key.
+	LoadActor("./ITLRankManager.lua"),
+
 	-- ---------------------------------------------------
 	-- next, load visual elements; the order of these matters
 	-- i.e. content in PerPlayer/Over needs to draw on top of content from PerPlayer/Under

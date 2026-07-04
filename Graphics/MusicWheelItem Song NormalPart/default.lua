@@ -204,4 +204,64 @@ for player in ivalues(PlayerNumber) do
 	}
 end
 
+-- Global ITL leaderboard rank (fetched on demand; see Scripts/SL-Helpers-ITLRank.lua
+-- and BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua). Shown to the LEFT
+-- of the row for the solo active player on played ITL songs.
+af[#af+1] = Def.BitmapText{
+	Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+	Text="",
+	Name="ITLGlobalRank",
+	InitCommand=function(self)
+		self:visible(false):horizalign(left):zoom(0.22)
+		-- TWEAK: horizontal position of the rank at the left of the row
+		self:x(4)
+		self.hash = nil
+	end,
+	SetCommand=function(self, params)
+		self:visible(false)
+		self.hash = nil
+
+		-- Solo only; active player needs a persistent profile.
+		local humans = GAMESTATE:GetHumanPlayers()
+		if #humans ~= 1 then return end
+		local player = humans[1]
+		if not PROFILEMAN:IsPersistentProfile(player) then return end
+		local pn = ToEnumShortString(player)
+
+		local song = params.Song
+		if not song then return end
+		local song_dir = song:GetSongDir()
+		if not song_dir or #song_dir == 0 then return end
+
+		local hash = SL[pn].ITLData["pathMap"][song_dir]
+		if not hash then return end
+		self.hash = hash
+
+		local rank = ITLRankGet(hash)
+		if type(rank) == "number" then
+			self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+		elseif rank == false then
+			-- fetched: player has no ITL rank on this chart
+			self:visible(false)
+		else
+			-- not fetched yet: ask the manager, but only if it can actually fetch
+			-- (mirror ITLRankManager's gate) so we don't accumulate hashes that
+			-- will never be drained. Updates arrive via ITLRankResolved.
+			if SL[pn].ApiKey ~= "" and IsServiceAllowed(SL.GrooveStats.GetScores) then
+				ITLRankEnqueue(hash)
+			end
+		end
+	end,
+	ITLRankResolvedMessageCommand=function(self, params)
+		if self.hash and params.hash == self.hash then
+			local rank = ITLRankGet(self.hash)
+			if type(rank) == "number" then
+				self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+			else
+				self:visible(false)
+			end
+		end
+	end,
+}
+
 return af

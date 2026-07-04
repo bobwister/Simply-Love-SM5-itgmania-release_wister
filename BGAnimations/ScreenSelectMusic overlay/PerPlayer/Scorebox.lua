@@ -170,6 +170,19 @@ local LeaderboardRequestProcessor = function(res, master)
 	-- First check to see if the leaderboard even exists.
 	if data and data[playerStr] then
 		if SL[pn].Streams.Hash ~= data[playerStr]["chartHash"] then return end
+
+		-- Seed the global-ITL-rank cache for the selected song so ITLRankManager
+		-- doesn't re-fetch it (see Scripts/SL-Helpers-ITLRank.lua). Runs regardless
+		-- of the ITL scorebox display toggle.
+		if data[playerStr]["itl"] and data[playerStr]["itl"]["itlLeaderboard"] then
+			local selfRank = false
+			for entry in ivalues(data[playerStr]["itl"]["itlLeaderboard"]) do
+				if entry["isSelf"] then selfRank = entry["rank"]; break end
+			end
+			ITLRankSet(data[playerStr]["chartHash"], selfRank)
+			MESSAGEMAN:Broadcast("ITLRankResolved", { hash=data[playerStr]["chartHash"] })
+		end
+
 		-- These will get overwritten if we have any entries in the leaderboard below.
 		SetScoreData(1, 1, "", "No Scores", "", false, false, false, false)
 		SetScoreData(2, 1, "", "No Scores", "", false, false, false, false)
