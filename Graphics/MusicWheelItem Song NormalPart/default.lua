@@ -141,18 +141,20 @@ for player in ivalues(PlayerNumber) do
 			self:visible(false)
 		end,
 	}
-	-- Song Rank
+	--[[ Song Rank (local top-N rank among this profile's ITL songs).
+	-- Superseded by the global ITL rank + points display below; kept here
+	-- commented out in case we want to bring it back.
 	af[#af+1] = Def.BitmapText{
 		Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
 		Text="",
 		InitCommand=function(self)
-			self:visible(false)			
-			if IsNotWide then 
+			self:visible(false)
+			if IsNotWide then
 				self:zoom(0.2)
 			else
 				self:zoom(0.3)
 			end
-			
+
 		end,
 		PlayerJoinedMessageCommand=function(self)
 			self:visible(GAMESTATE:IsPlayerEnabled(player))
@@ -168,7 +170,7 @@ for player in ivalues(PlayerNumber) do
 			end
 
 			local pn = ToEnumShortString(player)
-		
+
 			self:x(THEME:GetMetric("MusicWheelItem", "GradeP"..(pn == "P1" and 2 or 1).."X")-WideScale(28,33))
 
 			if params.Song ~= nil and GAMESTATE:GetNumSidesJoined() == 1 then
@@ -178,10 +180,10 @@ for player in ivalues(PlayerNumber) do
 					if SL[pn].ITLData["pathMap"][song_dir] ~= nil then
 						local hash = SL[pn].ITLData["pathMap"][song_dir]
 						if SL[pn].ITLData["hashMap"][hash] ~= nil then
-							if SL[pn].ITLData["hashMap"][hash]["rank"] ~= nil then 
+							if SL[pn].ITLData["hashMap"][hash]["rank"] ~= nil then
 								if SL[pn].ITLData["hashMap"][hash]["rank"] ~= nil then
 									local rank = SL[pn].ITLData["hashMap"][hash]["rank"]
-									
+
 									self:settext(tostring(rank))
 									local style = GAMESTATE:GetCurrentStyle():GetName()
 									if 		rank <=	(style == "single" and 10 or 5) 	then self:diffuse(SL.JudgmentColors["FA+"][1])
@@ -202,86 +204,120 @@ for player in ivalues(PlayerNumber) do
 			self:visible(false)
 		end,
 	}
-end
+	]]
 
--- Global ITL leaderboard rank + local ITL points (fetched on demand; see
--- Scripts/SL-Helpers-ITLRank.lua and BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua).
--- Shown bottom-right of the row, under the EX/points score, for the solo active player.
-local function ITLGlobalRankRefreshText(self)
-	local hash = self.hash
-	local pn = self.pn
-	if not hash or not pn then
-		self:visible(false)
-		return
-	end
+	-- Global ITL points (top line) + global ITL rank (bottom line), at the
+	-- same spot the local top-N "Song Rank" used to occupy. Points are
+	-- color-coded by the song's LOCAL top-N standing (green = top75,
+	-- yellow = top150, white otherwise); rank is the GLOBAL ITL leaderboard
+	-- rank, fetched on demand (see Scripts/SL-Helpers-ITLRank.lua and
+	-- BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua).
+	af[#af+1] = Def.BitmapText{
+		Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+		Text="",
+		InitCommand=function(self)
+			self:visible(false)
+			self:zoom(IsNotWide and 0.2 or 0.3)
+			-- TWEAK: top line of the pair, above the rank line below
+			self:y(-9)
+		end,
+		PlayerJoinedMessageCommand=function(self)
+			self:visible(GAMESTATE:IsPlayerEnabled(player))
+		end,
+		PlayerUnjoinedMessageCommand=function(self)
+			self:visible(GAMESTATE:IsPlayerEnabled(player))
+		end,
+		SetCommand=function(self, params)
+			self:visible(false)
 
-	local data = SL[pn].ITLData["hashMap"][hash]
-	local points = data and data["points"] or 0
-	local rank = ITLRankGet(hash)
+			if not GAMESTATE:IsPlayerEnabled(player) or not PROFILEMAN:IsPersistentProfile(player) then return end
+			if GAMESTATE:GetNumSidesJoined() ~= 1 then return end
+			if params.Song == nil then return end
 
-	if points == 0 and type(rank) ~= "number" then
-		self:visible(false)
-		return
-	end
+			local pn = ToEnumShortString(player)
+			self:x(THEME:GetMetric("MusicWheelItem", "GradeP"..(pn == "P1" and 2 or 1).."X")-WideScale(28,33))
 
-	if type(rank) == "number" then
-		self:settext( ("%s - %dpts"):format(ITLRankOrdinal(rank), points) ):diffuse(ITLRankColor(rank))
-	else
-		self:settext( ("%dpts"):format(points) ):diffuse(1,1,1,1)
-	end
-	self:visible(true)
-end
+			local song_dir = params.Song:GetSongDir()
+			if not song_dir or #song_dir == 0 then return end
+			local hash = SL[pn].ITLData["pathMap"][song_dir]
+			if not hash then return end
+			local data = SL[pn].ITLData["hashMap"][hash]
+			if not data then return end
 
-af[#af+1] = Def.BitmapText{
-	Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
-	Text="",
-	Name="ITLGlobalRank",
-	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(0.18)
-		-- TWEAK: bottom-right corner of the row, under the EX/points score
-		self:x( _screen.w/(WideScale(2.15, 2.14)) - 40 )
-		self:y(16)
-		self.hash = nil
-		self.pn = nil
-	end,
-	SetCommand=function(self, params)
-		self:visible(false)
-		self.hash = nil
-		self.pn = nil
+			local points = data["points"] or 0
+			if points == 0 then return end
 
-		-- Solo only; active player needs a persistent profile.
-		local humans = GAMESTATE:GetHumanPlayers()
-		if #humans ~= 1 then return end
-		local player = humans[1]
-		if not PROFILEMAN:IsPersistentProfile(player) then return end
-		local pn = ToEnumShortString(player)
-
-		local song = params.Song
-		if not song then return end
-		local song_dir = song:GetSongDir()
-		if not song_dir or #song_dir == 0 then return end
-
-		local hash = SL[pn].ITLData["pathMap"][song_dir]
-		if not hash then return end
-		self.hash = hash
-		self.pn = pn
-
-		ITLGlobalRankRefreshText(self)
-
-		if ITLRankGet(hash) == nil then
-			-- not fetched yet: ask the manager, but only if it can actually fetch
-			-- (mirror ITLRankManager's gate) so we don't accumulate hashes that
-			-- will never be drained. Updates arrive via ITLRankResolved.
-			if SL[pn].ApiKey ~= "" and IsServiceAllowed(SL.GrooveStats.GetScores) then
-				ITLRankEnqueue(hash)
+			local localRank = data["rank"]
+			if type(localRank) == "number" and localRank <= 75 then
+				self:diffuse(Color.Green)
+			elseif type(localRank) == "number" and localRank <= 150 then
+				self:diffuse(Color.Yellow)
+			else
+				self:diffuse(Color.White)
 			end
-		end
-	end,
-	ITLRankResolvedMessageCommand=function(self, params)
-		if self.hash and params.hash == self.hash then
-			ITLGlobalRankRefreshText(self)
-		end
-	end,
-}
+			self:settext( ("%dpts"):format(points) ):visible(true)
+		end,
+	}
+
+	af[#af+1] = Def.BitmapText{
+		Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+		Text="",
+		Name="ITLGlobalRank",
+		InitCommand=function(self)
+			self:visible(false)
+			self:zoom(IsNotWide and 0.2 or 0.3)
+			-- TWEAK: bottom line of the pair, below the points line above
+			self:y(9)
+			self.hash = nil
+		end,
+		PlayerJoinedMessageCommand=function(self)
+			self:visible(GAMESTATE:IsPlayerEnabled(player))
+		end,
+		PlayerUnjoinedMessageCommand=function(self)
+			self:visible(GAMESTATE:IsPlayerEnabled(player))
+		end,
+		SetCommand=function(self, params)
+			self:visible(false)
+			self.hash = nil
+
+			if not GAMESTATE:IsPlayerEnabled(player) or not PROFILEMAN:IsPersistentProfile(player) then return end
+			if GAMESTATE:GetNumSidesJoined() ~= 1 then return end
+			if params.Song == nil then return end
+
+			local pn = ToEnumShortString(player)
+			self:x(THEME:GetMetric("MusicWheelItem", "GradeP"..(pn == "P1" and 2 or 1).."X")-WideScale(28,33))
+
+			local song_dir = params.Song:GetSongDir()
+			if not song_dir or #song_dir == 0 then return end
+			local hash = SL[pn].ITLData["pathMap"][song_dir]
+			if not hash then return end
+			self.hash = hash
+
+			local rank = ITLRankGet(hash)
+			if type(rank) == "number" then
+				self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+			elseif rank == false then
+				self:visible(false)
+			else
+				-- not fetched yet: ask the manager, but only if it can actually fetch
+				-- (mirror ITLRankManager's gate) so we don't accumulate hashes that
+				-- will never be drained. Updates arrive via ITLRankResolved.
+				if SL[pn].ApiKey ~= "" and IsServiceAllowed(SL.GrooveStats.GetScores) then
+					ITLRankEnqueue(hash)
+				end
+			end
+		end,
+		ITLRankResolvedMessageCommand=function(self, params)
+			if self.hash and params.hash == self.hash then
+				local rank = ITLRankGet(self.hash)
+				if type(rank) == "number" then
+					self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+				else
+					self:visible(false)
+				end
+			end
+		end,
+	}
+end
 
 return af

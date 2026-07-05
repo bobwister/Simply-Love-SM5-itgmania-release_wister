@@ -4,7 +4,9 @@ IsItlSong = function(player)
 	local song_dir = song:GetSongDir()
 	local group = string.lower(song:GetGroupName())
 	local pn = ToEnumShortString(player)
-	return string.find(group, "itl online 2024") or string.find(group, "itl 2024") or SL[pn].ITLData["pathMap"][song_dir] ~= nil
+	-- Match "itl <year>" / "itl online <year>" for any year, not just 2024,
+	-- so newer season packs (ITL 2025, 2026, ...) are recognized too.
+	return string.find(group, "itl online %d%d%d%d") or string.find(group, "itl %d%d%d%d") or SL[pn].ITLData["pathMap"][song_dir] ~= nil
 end
 
 UpdatePathMap = function(player, hash)
@@ -287,7 +289,45 @@ ReadItlFile = function(player)
 		itlData["fixedStepsType"] = true
 	end
 
+	-- Fix songs whose points got stuck at 0 because of a since-fixed bug in
+	-- UpdateItlExScore (it referenced an undefined variable, so any chart
+	-- lacking a "pts"-suffixed #CHARTNAME field never had its points computed,
+	-- which in turn clumped all of them onto the same rank in CalculateITLSongRanks).
+	-- One-time sweep: recover maxPoints from each song's "[<maxPoints>]" title
+	-- prefix and recompute points, then re-rank everything once.
+	local fixedZeroPoints = false
+	if itlData["fixedZeroPointsFromTitle"] == nil then
+		local pathMap = itlData["pathMap"]
+		local hashMap = itlData["hashMap"]
+
+		for path, hash in pairs(pathMap) do
+			local data = hashMap[hash]
+			if data ~= nil and (data["points"] or 0) == 0 and data["ex"] ~= nil then
+				local songPath = path:gsub("/Songs", "")
+				local song = SONGMAN:FindSong(songPath)
+				if song ~= nil then
+					local titleMaxPoints = song:GetMainTitle():match("^%[(%d+)%]")
+					if titleMaxPoints then
+						local maxPoints = tonumber(titleMaxPoints)
+						data["maxPoints"] = maxPoints
+						if maxPoints > 0 then
+							data["points"] = GetPointsForSong(maxPoints, data["ex"]/100)
+							fixedZeroPoints = true
+						end
+					end
+				end
+			end
+		end
+
+		itlData["fixedZeroPointsFromTitle"] = true
+	end
+
 	SL[pn].ITLData = itlData
+
+	if fixedZeroPoints then
+		CalculateITLSongRanks(player)
+		WriteItlFile(player)
+	end
 end
 
 -- EX score is a number like 92.67
