@@ -589,12 +589,25 @@ UpdateItlExScore = function(player, hash, exscore)
 		end
 
 		if maxPoints == nil then
-			--  See if we already have these points stored if we failed to parse it.
-			if prevData ~= nil and prevData["maxPoints"] ~= nil then
-				maxPoints = prevData["maxPoints"]
-			-- Otherwise we don't know how many points this chart is. Default to 0.
+			-- See if we already have these points stored from a previous
+			-- successful parse of this same chart (the ChartName field was
+			-- absent/unparseable this time round).
+			if hashMap[hash]["maxPoints"] ~= nil and hashMap[hash]["maxPoints"] > 0 then
+				maxPoints = hashMap[hash]["maxPoints"]
 			else
-				maxPoints = 0
+				-- Last resort: ITL pack titles are prefixed with "[<maxPoints>]"
+				-- (e.g. "[8150] [14] Song Name"). Charts whose #CHARTNAME field
+				-- doesn't carry a "pts" suffix (anything outside the official
+				-- ITL pack folder) would otherwise be stuck at 0 points forever.
+				local song = GAMESTATE:GetCurrentSong()
+				local titleMaxPoints = song and song:GetMainTitle():match("^%[(%d+)%]")
+				if titleMaxPoints then
+					maxPoints = tonumber(titleMaxPoints)
+					hashMap[hash]["maxPoints"] = maxPoints
+				else
+					-- Otherwise we don't know how many points this chart is. Default to 0.
+					maxPoints = 0
+				end
 			end
 		end
 		

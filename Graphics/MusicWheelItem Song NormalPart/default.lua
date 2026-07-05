@@ -204,22 +204,50 @@ for player in ivalues(PlayerNumber) do
 	}
 end
 
--- Global ITL leaderboard rank (fetched on demand; see Scripts/SL-Helpers-ITLRank.lua
--- and BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua). Shown to the LEFT
--- of the row for the solo active player on played ITL songs.
+-- Global ITL leaderboard rank + local ITL points (fetched on demand; see
+-- Scripts/SL-Helpers-ITLRank.lua and BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua).
+-- Shown bottom-right of the row, under the EX/points score, for the solo active player.
+local function ITLGlobalRankRefreshText(self)
+	local hash = self.hash
+	local pn = self.pn
+	if not hash or not pn then
+		self:visible(false)
+		return
+	end
+
+	local data = SL[pn].ITLData["hashMap"][hash]
+	local points = data and data["points"] or 0
+	local rank = ITLRankGet(hash)
+
+	if points == 0 and type(rank) ~= "number" then
+		self:visible(false)
+		return
+	end
+
+	if type(rank) == "number" then
+		self:settext( ("%s - %dpts"):format(ITLRankOrdinal(rank), points) ):diffuse(ITLRankColor(rank))
+	else
+		self:settext( ("%dpts"):format(points) ):diffuse(1,1,1,1)
+	end
+	self:visible(true)
+end
+
 af[#af+1] = Def.BitmapText{
 	Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
 	Text="",
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
-		self:visible(false):horizalign(left):zoom(0.22)
-		-- TWEAK: horizontal position of the rank at the left of the row
-		self:x(4)
+		self:visible(false):horizalign(right):zoom(0.18)
+		-- TWEAK: bottom-right corner of the row, under the EX/points score
+		self:x( _screen.w/(WideScale(2.15, 2.14)) - 40 )
+		self:y(16)
 		self.hash = nil
+		self.pn = nil
 	end,
 	SetCommand=function(self, params)
 		self:visible(false)
 		self.hash = nil
+		self.pn = nil
 
 		-- Solo only; active player needs a persistent profile.
 		local humans = GAMESTATE:GetHumanPlayers()
@@ -236,14 +264,11 @@ af[#af+1] = Def.BitmapText{
 		local hash = SL[pn].ITLData["pathMap"][song_dir]
 		if not hash then return end
 		self.hash = hash
+		self.pn = pn
 
-		local rank = ITLRankGet(hash)
-		if type(rank) == "number" then
-			self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
-		elseif rank == false then
-			-- fetched: player has no ITL rank on this chart
-			self:visible(false)
-		else
+		ITLGlobalRankRefreshText(self)
+
+		if ITLRankGet(hash) == nil then
 			-- not fetched yet: ask the manager, but only if it can actually fetch
 			-- (mirror ITLRankManager's gate) so we don't accumulate hashes that
 			-- will never be drained. Updates arrive via ITLRankResolved.
@@ -254,12 +279,7 @@ af[#af+1] = Def.BitmapText{
 	end,
 	ITLRankResolvedMessageCommand=function(self, params)
 		if self.hash and params.hash == self.hash then
-			local rank = ITLRankGet(self.hash)
-			if type(rank) == "number" then
-				self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
-			else
-				self:visible(false)
-			end
+			ITLGlobalRankRefreshText(self)
 		end
 	end,
 }
