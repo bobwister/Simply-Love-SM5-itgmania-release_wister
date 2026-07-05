@@ -23,6 +23,11 @@ local af = Def.ActorFrame{
 		end
 		generateFavoritesForMusicWheel()
 		ApplyMods(params.Player)
+		-- The new profile's mods (incl. speedmod) are now in SL[pn].ActiveModifiers.
+		-- Tell the wheel's speedmod display to refresh: it only re-reads on this
+		-- message (see Graphics/MusicWheel highlight.lua), so without this the
+		-- speedmod shown on the wheel keeps the previous profile's value.
+		MESSAGEMAN:Broadcast("PlayerOptionsChanged", {Player=params.Player})
 	end,
 
 	PlayerJoinedMessageCommand=function(self, params)
