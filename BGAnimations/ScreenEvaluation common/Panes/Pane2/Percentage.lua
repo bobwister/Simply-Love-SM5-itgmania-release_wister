@@ -84,7 +84,10 @@ return Def.ActorFrame{
 		Name="Percent",
 		Text=("%.2f"):format(percent),
 		InitCommand=function(self)
-			self:horizalign(right):zoom(1.3)
+			-- Match the secondary score's effective size (JudgmentNumbers.lua: zoom 1.3
+			-- inside its own 0.8-zoom parent frame = 1.04), + 10%, so this doesn't
+			-- overlap the "ITG"/"EX" label to its left.
+			self:horizalign(right):zoom(0.8 * 1.3 * 1.1)
 			self:x( (controller == PLAYER_1 and 1.5 or 141))
 			self:diffuse(diffuse)
 		end,
