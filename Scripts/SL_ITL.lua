@@ -9,6 +9,17 @@ IsItlSong = function(player)
 	return string.find(group, "itl online %d%d%d%d") or string.find(group, "itl %d%d%d%d") or SL[pn].ITLData["pathMap"][song_dir] ~= nil
 end
 
+-- Extracts the 4-digit ITL season year from a song's group name (e.g.
+-- "ITL Online 2025 Unlocks" -> "2025"), or nil if it isn't an ITL group.
+-- GrooveStats runs ITL as a fresh competition every season, with its own
+-- single/doubles standings - a chart's local Top-N rank must only ever be
+-- compared against other charts from the SAME season, never pooled together.
+ITLSeasonFromGroupName = function(groupName)
+	if not groupName then return nil end
+	local group = string.lower(groupName)
+	return group:match("itl%s+online%s+(%d%d%d%d)") or group:match("itl%s+(%d%d%d%d)")
+end
+
 UpdatePathMap = function(player, hash)
 	local song = GAMESTATE:GetCurrentSong()
 	local song_dir = song:GetSongDir()
@@ -289,29 +300,54 @@ ReadItlFile = function(player)
 		itlData["fixedStepsType"] = true
 	end
 
-	-- Fix songs whose points got stuck at 0 because of a since-fixed bug in
-	-- UpdateItlExScore (it referenced an undefined variable, so any chart
-	-- lacking a "pts"-suffixed #CHARTNAME field never had its points computed,
-	-- which in turn clumped all of them onto the same rank in CalculateITLSongRanks).
-	-- One-time sweep: recover maxPoints from each song's "[<maxPoints>]" title
-	-- prefix and recompute points, then re-rank everything once.
+	-- Backfill "season" (the ITL year each chart belongs to, e.g. "2025") on
+	-- older data that predates this field, same cross-reference as the
+	-- stepsType sweep above. Needed so CalculateITLSongRanks can rank each
+	-- season's charts separately instead of pooling 2024/2025/2026 together.
+	if itlData["fixedSeason"] == nil then
+		local pathMap = itlData["pathMap"]
+		local hashMap = itlData["hashMap"]
+
+		for path, hash in pairs(pathMap) do
+			if hashMap[hash] ~= nil and hashMap[hash]["season"] == nil then
+				local songPath = path:gsub("/Songs", "")
+				local song = SONGMAN:FindSong(songPath)
+				if song ~= nil then
+					hashMap[hash]["season"] = ITLSeasonFromGroupName(song:GetGroupName()) or "unknown"
+				end
+			end
+		end
+		itlData["fixedSeason"] = true
+	end
+
+	-- Fix songs whose points got stuck at 0. Two causes, both since fixed:
+	-- UpdateItlExScore referenced an undefined variable, and it ran tonumber()
+	-- directly on #CHARTNAME - which yields nil for the "<P> (P) + <S> (S)"
+	-- format introduced in ITL 2025. Either way points stayed 0, which also
+	-- clumped every affected chart onto the same rank in CalculateITLSongRanks.
+	-- One-time sweep: re-parse each chart's #CHARTNAME and recompute points,
+	-- then re-rank everything once.
 	local fixedZeroPoints = false
-	if itlData["fixedZeroPointsFromTitle"] == nil then
+	if itlData["fixedSplitFormatPoints"] == nil then
 		local pathMap = itlData["pathMap"]
 		local hashMap = itlData["hashMap"]
 
 		for path, hash in pairs(pathMap) do
 			local data = hashMap[hash]
-			if data ~= nil and (data["points"] or 0) == 0 and data["ex"] ~= nil then
+			if data ~= nil and (data["points"] or 0) == 0
+					and type(data["ex"]) == "number" and data["ex"] > 0 then
 				local songPath = path:gsub("/Songs", "")
 				local song = SONGMAN:FindSong(songPath)
 				if song ~= nil then
-					local titleMaxPoints = song:GetMainTitle():match("^%[(%d+)%]")
-					if titleMaxPoints then
-						local maxPoints = tonumber(titleMaxPoints)
-						data["maxPoints"] = maxPoints
-						if maxPoints > 0 then
-							data["points"] = GetPointsForSong(maxPoints, data["ex"]/100)
+					local allSteps = song:GetAllSteps()
+					if #allSteps == 1 then
+						local points, passingPoints, maxScoringPoints =
+								ITLPointsForSteps(allSteps[1], data["ex"]/100)
+						if points then
+							data["points"]           = points
+							data["passingPoints"]    = passingPoints
+							data["maxScoringPoints"] = maxScoringPoints
+							data["maxPoints"]        = passingPoints + maxScoringPoints
 							fixedZeroPoints = true
 						end
 					end
@@ -319,12 +355,19 @@ ReadItlFile = function(player)
 			end
 		end
 
-		itlData["fixedZeroPointsFromTitle"] = true
+		itlData["fixedSplitFormatPoints"] = true
 	end
 
 	SL[pn].ITLData = itlData
 
-	if fixedZeroPoints then
+	-- CalculateITLSongRanks now scopes ranks per (season, stepsType) instead
+	-- of pooling every season together (see below) - force one recompute for
+	-- profiles that still have the old pooled ranks cached, even if nothing
+	-- else needed fixing this load.
+	local needsRankRecompute = fixedZeroPoints or (itlData["fixedSeasonScopedRanks"] == nil)
+	itlData["fixedSeasonScopedRanks"] = true
+
+	if needsRankRecompute then
 		CalculateITLSongRanks(player)
 		WriteItlFile(player)
 	end
@@ -365,6 +408,66 @@ GetITLPointsForSong = function(maxPoints, exScore)
 
 	local percent = roundPlaces((first + second) / 100.0, 6)
 	return math.floor(maxPoints * percent)
+end
+
+-- -----------------------------------------------------------------------
+-- ITL chart point values live in the chart's #CHARTNAME field, in one of two
+-- formats depending on the event year (both are present in a typical install,
+-- since players keep old season packs installed alongside new ones):
+--
+--   ITL 2024 and earlier:  "1295 pts"             all points are scoring points
+--   ITL 2025 and later:    "1360 (P) + 2043 (S)"  flat passing award + scoring points
+--
+-- Returns passingPoints, maxScoringPoints, format ("ps" or "pts"),
+-- or nil when the field can't be parsed.
+ITLParseChartPoints = function(chartName)
+	if type(chartName) ~= "string" then return nil end
+
+	-- Newer split format.
+	local p, s = chartName:match("(%d+)%s*%(P%)%s*%+%s*(%d+)%s*%(S%)")
+	if p and s then return tonumber(p), tonumber(s), "ps" end
+
+	-- Legacy "<N> pts".
+	local n = chartName:match("(%d+)%s*pts")
+	if n then return 0, tonumber(n), "pts" end
+
+	return nil
+end
+
+-- ITL 2025+ scoring curve: passing the chart awards passingPoints outright,
+-- and the scoring points are earned along a single exponential curve.
+-- Mirrors GetITLPointsForSong in the stock Simply Love theme.
+local ITLPointsSplitFormat = function(passingPoints, maxScoringPoints, exScore)
+	local scalar = 40.0
+	local curve = (math.pow(scalar, math.max(0, exScore) / scalar) - 1)
+			* (100.0 / (math.pow(scalar, 100 / scalar) - 1.0))
+
+	local factor = 10 ^ 6
+	local percent = math.floor((curve / 100.0) * factor + 0.5) / factor
+
+	return passingPoints + math.floor(maxScoringPoints * percent)
+end
+
+-- Points for a chart, dispatching on which #CHARTNAME format it used.
+-- exScore is a percentage like 92.67.
+ITLComputePoints = function(passingPoints, maxScoringPoints, format, exScore)
+	if format == "ps" then
+		return ITLPointsSplitFormat(passingPoints, maxScoringPoints, exScore)
+	end
+	-- Legacy charts: the whole value is scoring points on the old two-part curve.
+	return GetITLPointsForSong(maxScoringPoints, exScore)
+end
+
+-- Convenience: read a chart's point values straight off its #CHARTNAME and
+-- compute the points an exScore (percentage like 92.67) would be worth.
+-- Returns points, passingPoints, maxScoringPoints, format - or nil if the
+-- chart doesn't declare parseable point values.
+ITLPointsForSteps = function(steps, exScore)
+	if not steps then return nil end
+	local passingPoints, maxScoringPoints, format = ITLParseChartPoints(steps:GetChartName())
+	if not format then return nil end
+	return ITLComputePoints(passingPoints, maxScoringPoints, format, exScore),
+			passingPoints, maxScoringPoints, format
 end
 
 -- Helper function used within UpdateItlData() below.
@@ -412,27 +515,34 @@ local DataForSong = function(player, prevData)
 	local pn = ToEnumShortString(player)
 
 	local steps = GAMESTATE:GetCurrentSteps(player)
-	local chartName = steps:GetChartName()
 
 	-- Note that playing OUTSIDE of the ITL pack will result in 0 points for all upscores.
 	-- Technically this number isn't displayed, but players can opt to swap the EX score in the
 	-- wheel with this value instead if they prefer.
-	local maxPoints = chartName:gsub(" pts", "")
-	if #maxPoints == 0 then
-		maxPoints = nil
-	else
-		maxPoints = tonumber(maxPoints)
-	end
+	--
+	-- #CHARTNAME comes in two formats (see ITLParseChartPoints): "<N> pts" up to
+	-- ITL 2024, and "<P> (P) + <S> (S)" from ITL 2025 on. Parsing must handle
+	-- both, or every chart from a 2025+ pack records 0 points.
+	local passingPoints, maxScoringPoints, format = ITLParseChartPoints(steps:GetChartName())
 
-	if maxPoints == nil then
-		--  See if we already have these points stored if we failed to parse it.
-		if prevData ~= nil and prevData["maxPoints"] ~= nil then
-			maxPoints = prevData["maxPoints"]
-		-- Otherwise we don't know how many points this chart is. Default to 0.
-		else
-			maxPoints = 0
+	if not format and prevData ~= nil then
+		-- Fall back to values stored from an earlier successful parse.
+		if (prevData["maxScoringPoints"] or 0) > 0 then
+			passingPoints    = prevData["passingPoints"] or 0
+			maxScoringPoints = prevData["maxScoringPoints"]
+			format = passingPoints > 0 and "ps" or "pts"
+		elseif (prevData["maxPoints"] or 0) > 0 then
+			-- Legacy data predating the split fields.
+			passingPoints, maxScoringPoints, format = 0, prevData["maxPoints"], "pts"
 		end
 	end
+
+	if not format then
+		-- Otherwise we don't know how many points this chart is. Default to 0.
+		passingPoints, maxScoringPoints, format = 0, 0, "pts"
+	end
+
+	local maxPoints = passingPoints + maxScoringPoints
 	
 	
 	-- Assume C-Mod is okay by default.
@@ -462,7 +572,7 @@ local DataForSong = function(player, prevData)
 	local judgments = GetExJudgmentCounts(player)
 	local ex = CalculateExScore(player, judgments)
 	local clearType = GetClearType(judgments)
-	local points = GetITLPointsForSong(maxPoints, ex)
+	local points = ITLComputePoints(passingPoints, maxScoringPoints, format, ex)
 	local usedCmod = GAMESTATE:GetPlayerState(pn):GetPlayerOptions("ModsLevel_Preferred"):CMod() ~= nil
 	local date = ("%04d-%02d-%02d"):format(year, month, day)
 	local stepsType = steps:GetStepsType() == "StepsType_Dance_Single" and "single" or "double"
@@ -475,6 +585,8 @@ local DataForSong = function(player, prevData)
 		["usedCmod"] = usedCmod,
 		["date"] = date,
 		["noCmod"] = noCmod,
+		["passingPoints"] = passingPoints,
+		["maxScoringPoints"] = maxScoringPoints,
 		["maxPoints"] = maxPoints,
 		["stepsType"] = stepsType,
 	}
@@ -503,82 +615,65 @@ CalculateITLStats = function(player)
     return tp, rp, played
 end
 
--- Calculate Song Ranks
+-- Calculate Song Ranks.
+--
+-- The displayed per-song "rank" (used to color-code the points line green/
+-- yellow/white on the wheel) is scoped to (season, stepsType): GrooveStats
+-- runs ITL as a fresh competition every year, with separate single/doubles
+-- standings, so a chart's Top-N standing must only ever be compared against
+-- other charts from the SAME season and style - never pooled across seasons,
+-- or a chart that's genuinely Top 75 within its own season could get pushed
+-- down by unrelated charts from a different year entirely.
 CalculateITLSongRanks = function(player)
 	local pn = ToEnumShortString(player)
-	
+
 	-- Grab data from memory
 	itlData = SL[pn].ITLData
 	local songHashes = itlData["hashMap"]
 
-	--TODO: delete this once it's confirmed working
-	-- Create and populate tables to rank each hash score	
+	-- Overall (all seasons/styles pooled) point list - kept only because
+	-- CalculateITLStats reads itlData["points"] for the TP/RP display.
 	local points = {}
-	local songPoints = {}
 	for key in pairs(songHashes) do
-		songPoints[key] = songHashes[key]["points"]
-		table.insert(points,songHashes[key]["points"])
-	end		 
-	-- Reverse sort points values
-	table.sort(points,function(a,b) return a > b end)
-
-	for key in pairs(songPoints) do
-		local point = songPoints[key]
-		-- search for the point value in the list
-		for k, v in pairs(points) do
-			if v == point then
-				songHashes[key]["rank"] = k
-				break
-			end
-		end		 	
+		points[#points + 1] = songHashes[key]["points"]
 	end
-	itlData["hashMap"] = songHashes
-
-	-- Write song scores sorted by point value descending into json
+	table.sort(points, function(a,b) return a > b end)
 	itlData["points"] = points
 
-	-- Create and populate tables to rank each hash score by stepsType
-	local pointsSingle = {}
-	local pointsDouble = {}
-	
-	local songPointsSingle = {}
-	local songPointsDouble = {}
-	for key in pairs(songHashes) do
-		if songHashes[key]["stepsType"] == "single" then			
-			songPointsSingle[key] = songHashes[key]["points"]
-			table.insert(pointsSingle,songHashes[key]["points"])
-		else -- don't need to specify doubles right? unless there will ITL Couples will become a thing lol
-			songPointsDouble[key] = songHashes[key]["points"]
-			table.insert(pointsDouble,songHashes[key]["points"])
-		end
-	end		 
-	-- Reverse sort points values
-	table.sort(pointsSingle,function(a,b) return a > b end)
-	table.sort(pointsDouble,function(a,b) return a > b end)
-
-	for k, v in pairs(pointsSingle) do
-		for key in pairs(songHashes) do
-			if songHashes[key]["stepsType"] == "single" and songHashes[key]["points"] == v then
-				songHashes[key]["rank"] = k
-				break
-			end
-		end
+	-- Bucket every chart by (season, stepsType), then rank within each bucket.
+	local buckets = {}
+	for key, data in pairs(songHashes) do
+		local bucketKey = (data["season"] or "unknown") .. "|" .. (data["stepsType"] or "single")
+		buckets[bucketKey] = buckets[bucketKey] or {}
+		buckets[bucketKey][#buckets[bucketKey] + 1] = key
 	end
 
-	for k, v in pairs(pointsDouble) do
-		for key in pairs(songHashes) do
-			if songHashes[key]["stepsType"] == "double" and songHashes[key]["points"] == v then
-				songHashes[key]["rank"] = k
-				break
+	local pointsSingle, pointsDouble = {}, {}
+	for bucketKey, keys in pairs(buckets) do
+		local bucketPoints = {}
+		for _, key in ipairs(keys) do
+			bucketPoints[#bucketPoints + 1] = songHashes[key]["points"]
+		end
+		table.sort(bucketPoints, function(a,b) return a > b end)
+
+		for _, key in ipairs(keys) do
+			local point = songHashes[key]["points"]
+			for k, v in ipairs(bucketPoints) do
+				if v == point then
+					songHashes[key]["rank"] = k
+					break
+				end
 			end
 		end
+
+		-- Combined-across-seasons single/double point lists, preserved for
+		-- continuity with pre-existing data; nothing outside this function
+		-- currently reads them.
+		local target = bucketKey:match("|single$") and pointsSingle or pointsDouble
+		for _, p in ipairs(bucketPoints) do target[#target + 1] = p end
 	end
 
 	itlData["hashMap"] = songHashes
-
-	-- Write song scores sorted by point value descending into json
-	itlData["points"] = points
-
 	itlData["pointsSingle"] = pointsSingle
 	itlData["pointsDouble"] = pointsDouble
 
@@ -586,13 +681,29 @@ CalculateITLSongRanks = function(player)
 	SL[pn].ITLData = itlData
 end
 
--- Quick function that overwrites EX score entry if the score found is higher than what is found locally
-UpdateItlExScore = function(player, hash, exscore)
+-- Quick function that overwrites EX score entry if the score found is higher than what is found locally.
+-- `song`/`steps` must be the ones `hash` actually belongs to - NOT read from
+-- GAMESTATE:GetCurrentSong/Steps(), since callers may be updating a chart the
+-- player never selected (e.g. ITLRankManager fetches leaderboards for the whole
+-- pack, not just whatever's currently highlighted on the wheel).
+-- `steps` is optional: pass nil when the exact chart isn't cheaply known (only
+-- costs the "<N> pts" #CHARTNAME route to maxPoints, which falls back to the
+-- pack title's "[<N>]" prefix anyway).
+UpdateItlExScore = function(player, hash, exscore, song, steps)
 	local pn = ToEnumShortString(player)
 	local hashMap = SL[pn].ITLData["hashMap"]
 	if hashMap[hash] == nil then
 		-- New score, just copy things over.
-		local steps = GAMESTATE:GetCurrentSteps(player)
+		local stepsType = "single"
+		if steps then
+			stepsType = steps:GetStepsType() == "StepsType_Dance_Single" and "single" or "double"
+		elseif song then
+			-- No explicit chart: unambiguous only when the song has just one.
+			local allSteps = song:GetAllSteps()
+			if #allSteps == 1 then
+				stepsType = allSteps[1]:GetStepsType() == "StepsType_Dance_Single" and "single" or "double"
+			end
+		end
 
 		hashMap[hash] = {
 			["judgments"] = {},
@@ -604,60 +715,53 @@ UpdateItlExScore = function(player, hash, exscore)
 			["maxPoints"] = 0,
 			["noCmod"] = false,
 			-- ITL has doubles now. populate the steps type of the song
-			["stepsType"] = steps:GetStepsType() == "StepsType_Dance_Single" and "single" or "double",
+			["stepsType"] = stepsType,
+			-- Which ITL year this chart belongs to, so CalculateITLSongRanks
+			-- never pools different seasons' standings together.
+			["season"] = song and ITLSeasonFromGroupName(song:GetGroupName()) or "unknown",
 		}
-		
+
 		updated = true
 	end
 
 	if exscore >= hashMap[hash]["ex"] or hashMap[hash]["points"] == 0 then
 		hashMap[hash]["ex"] = exscore
-		
-		local steps = GAMESTATE:GetCurrentSteps(player)
-		local chartName = steps:GetChartName()
-		
 
-		local maxPoints = nil
-		if steps:GetDescription() == SL[pn].Streams.Description then
-			maxPoints = chartName:gsub(" pts", "")
-			if #maxPoints == 0 then
-				maxPoints = nil
-			else
-				maxPoints = tonumber(maxPoints)
-				hashMap[hash]["maxPoints"] = maxPoints
+		-- Point values come from the chart's #CHARTNAME. Two formats exist
+		-- (see ITLParseChartPoints): "<N> pts" for ITL 2024 and earlier, and
+		-- "<P> (P) + <S> (S)" from ITL 2025 on. The old code here ran
+		-- tonumber() on the raw field, which silently yields nil for the split
+		-- format - that's why 2025/2026 charts were all stuck at 0 points.
+		if not steps and song then
+			-- Recover the chart when the caller couldn't cheaply supply it;
+			-- unambiguous only for single-chart songs (the ITL pack norm).
+			local allSteps = song:GetAllSteps()
+			if #allSteps == 1 then steps = allSteps[1] end
+		end
+
+		local passingPoints, maxScoringPoints, format
+		if steps then
+			passingPoints, maxScoringPoints, format = ITLParseChartPoints(steps:GetChartName())
+		end
+
+		if not format then
+			-- Fall back to values stored from an earlier successful parse.
+			if (hashMap[hash]["maxScoringPoints"] or 0) > 0 then
+				passingPoints   = hashMap[hash]["passingPoints"] or 0
+				maxScoringPoints = hashMap[hash]["maxScoringPoints"]
+				format = passingPoints > 0 and "ps" or "pts"
 			end
 		end
 
-		if maxPoints == nil then
-			-- See if we already have these points stored from a previous
-			-- successful parse of this same chart (the ChartName field was
-			-- absent/unparseable this time round).
-			if hashMap[hash]["maxPoints"] ~= nil and hashMap[hash]["maxPoints"] > 0 then
-				maxPoints = hashMap[hash]["maxPoints"]
-			else
-				-- Last resort: ITL pack titles are prefixed with "[<maxPoints>]"
-				-- (e.g. "[8150] [14] Song Name"). Charts whose #CHARTNAME field
-				-- doesn't carry a "pts" suffix (anything outside the official
-				-- ITL pack folder) would otherwise be stuck at 0 points forever.
-				local song = GAMESTATE:GetCurrentSong()
-				local titleMaxPoints = song and song:GetMainTitle():match("^%[(%d+)%]")
-				if titleMaxPoints then
-					maxPoints = tonumber(titleMaxPoints)
-					hashMap[hash]["maxPoints"] = maxPoints
-				else
-					-- Otherwise we don't know how many points this chart is. Default to 0.
-					maxPoints = 0
-				end
-			end
+		if format then
+			hashMap[hash]["passingPoints"]   = passingPoints
+			hashMap[hash]["maxScoringPoints"] = maxScoringPoints
+			hashMap[hash]["maxPoints"]        = passingPoints + maxScoringPoints
+			hashMap[hash]["points"] = ITLComputePoints(passingPoints, maxScoringPoints, format, exscore/100)
 		end
-		
-		-- Do not recalculate points if maxPoints is 0
-		if maxPoints > 0 then
-			hashMap[hash]["points"] = GetPointsForSong(maxPoints, exscore/100)
-		end
-		
+
 		updated = true
-		
+
 		if updated then
 			CalculateITLSongRanks(player)
 			WriteItlFile(player)
@@ -733,6 +837,7 @@ UpdateItlData = function(player)
 				["maxPoints"] = data["maxPoints"],
 				["noCmod"] = data["noCmod"],
 				["stepsType"] = data["stepsType"],
+				["season"] = ITLSeasonFromGroupName(song:GetGroupName()) or "unknown",
 			}
 			updated = true
 		else

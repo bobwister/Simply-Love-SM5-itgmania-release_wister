@@ -842,3 +842,23 @@ ParseChartInfo = function(steps, pn)
 		end
 	end
 end
+
+-- Same GrooveStats-style hash as ParseChartInfo, but WITHOUT touching
+-- SL[pn].Streams (that table caches "the currently examined chart" for the
+-- density graph and friends; overwriting it for a chart the player hasn't
+-- actually selected would corrupt that display). Used by the ITL background
+-- prefetcher to discover hashes for songs the player hasn't visited yet.
+-- Returns the hash string, or nil if the chart couldn't be parsed.
+ComputeItlChartHash = function(steps)
+	local stepsType = ToEnumShortString( steps:GetStepsType() ):gsub("_", "-"):lower()
+	local difficulty = ToEnumShortString( steps:GetDifficulty() )
+	local description = steps:GetDescription()
+
+	local simfileString, fileType = GetSimfileString( steps )
+	if not simfileString then return nil end
+
+	local chartString, BPMs = GetSimfileChartString(simfileString, stepsType, difficulty, description, fileType)
+	if chartString == nil or BPMs == nil then return nil end
+
+	return BinaryToHex(CRYPTMAN:SHA1String(chartString..BPMs)):sub(1, 16)
+end

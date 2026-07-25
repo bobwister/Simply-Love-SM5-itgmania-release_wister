@@ -78,14 +78,79 @@ ITLRankOrdinal = function(n)
 	return tostring(n) .. suffix
 end
 
--- Tier color for a rank, reusing the FA+ judgment gradient (top ranks = gold),
--- mirroring the existing per-row local-rank coloring.
+-- Tier color for a global ITL rank.
 ITLRankColor = function(n)
 	if type(n) ~= "number" then return Color.White end
-	if     n <= 10 then return SL.JudgmentColors["FA+"][1]
-	elseif n <= 25 then return SL.JudgmentColors["FA+"][2]
-	elseif n <= 50 then return SL.JudgmentColors["FA+"][3]
-	elseif n <= 75 then return SL.JudgmentColors["FA+"][4]
-	elseif n <= 85 then return SL.JudgmentColors["FA+"][5]
-	else                return Color.Red end
+	if     n <= 10  then return color("#FFD700") -- gold
+	elseif n <= 50  then return Color.Green
+	elseif n <= 100 then return Color.Yellow
+	else                 return Color.White end
+end
+
+-- Resolve song -> chart hash, computing and caching it into pathMap on the
+-- fly if it isn't known yet (e.g. the player has never selected/played this
+-- chart before, so nothing has populated pathMap for it). Only handles songs
+-- with exactly one steps chart, same assumption ReadItlFile's stepsType sweep
+-- already makes about what counts as a "pure" ITL chart. Returns a hash, or
+-- nil if it can't be resolved (ambiguous song, unparseable chart, etc.).
+ITLResolveHashForSong = function(pn, song)
+	if not song then return nil end
+	local song_dir = song:GetSongDir()
+	if not song_dir or #song_dir == 0 then return nil end
+
+	local pathMap = SL[pn].ITLData["pathMap"]
+	local hash = pathMap[song_dir]
+	if hash then return hash end
+
+	local allSteps = song:GetAllSteps()
+	if #allSteps ~= 1 then return nil end
+
+	hash = ComputeItlChartHash(allSteps[1])
+	if not hash then return nil end
+
+	pathMap[song_dir] = hash
+	return hash
+end
+
+-- ITL points for a chart, computed from PURELY LOCAL data - no network needed.
+-- Points are a deterministic function of the chart's declared point values
+-- (its #CHARTNAME field) and the player's EX score, and both are available
+-- offline: `ex` is already stored in the profile's ITL file for any chart the
+-- player has scored on.
+--
+-- This deliberately does NOT depend on the GrooveStats leaderboard fetch: the
+-- fetch is only needed for the GLOBAL RANK (and to learn EX scores set on other
+-- machines). Keeping points independent means they render immediately for every
+-- locally-scored chart on screen, while ranks trickle in afterwards per song.
+--
+-- Repairs (and caches) a stuck `points = 0` in place when it can, so the
+-- profile's data converges to correct values as songs get looked at. This
+-- matters because a long-standing bug in UpdateItlExScore, plus the ITL 2025
+-- change to the #CHARTNAME format, left many charts stored with points = 0.
+-- Returns a number (0 when genuinely unknown/unscored).
+ITLGetPoints = function(pn, song, hash)
+	if not hash then return 0 end
+	local data = SL[pn].ITLData["hashMap"][hash]
+	if not data then return 0 end
+
+	local points = data["points"] or 0
+	if points > 0 then return points end
+
+	local ex = data["ex"]
+	if type(ex) ~= "number" or ex <= 0 then return 0 end
+	if not song then return 0 end
+
+	-- Recompute from the chart's own #CHARTNAME. Only unambiguous when the song
+	-- has a single chart, which is the norm for ITL pack entries.
+	local allSteps = song:GetAllSteps()
+	if #allSteps ~= 1 then return 0 end
+
+	local computed, passingPoints, maxScoringPoints = ITLPointsForSteps(allSteps[1], ex/100)
+	if not computed then return 0 end
+
+	data["points"] = computed
+	data["passingPoints"] = passingPoints
+	data["maxScoringPoints"] = maxScoringPoints
+	data["maxPoints"] = passingPoints + maxScoringPoints
+	return computed
 end
