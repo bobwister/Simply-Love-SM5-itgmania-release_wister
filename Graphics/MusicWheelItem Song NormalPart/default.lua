@@ -83,7 +83,7 @@ for player in ivalues(PlayerNumber) do
 	-- Add ITL EX scores to the song wheel as well.
 	-- It will be centered to the item if only one player is enabled, and stacked otherwise.
 	af[#af+1] = Def.BitmapText{
-		Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+		Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 		Text="",
 		InitCommand=function(self)
 			self:visible(false)
@@ -218,7 +218,7 @@ end
 -- Scripts/SL-Helpers-ITLRank.lua and
 -- BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua).
 af[#af+1] = Def.BitmapText{
-	Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 	Text="",
 	InitCommand=function(self)
 		self:visible(false):horizalign(right):zoom(0.2):y(7)
@@ -279,7 +279,7 @@ af[#af+1] = Def.BitmapText{
 }
 
 af[#af+1] = Def.BitmapText{
-	Font=ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small" or "Mega/_mega font",
+	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 	Text="",
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
