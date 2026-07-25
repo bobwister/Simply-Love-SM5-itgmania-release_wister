@@ -3,8 +3,8 @@ local pn = ToEnumShortString(player)
 local mods = SL[pn].ActiveModifiers
 
 local HEX_COLOR = color("#FF4FCB")
-local show10 = true       -- toggle state for the score number marquee
-local show10_label = true -- toggle state for the score type label marquee
+local show10 = false       -- toggle state for the score number marquee; false so the first frame is EX, not H.EX
+local show10_label = false -- toggle state for the score type label marquee; false so the first frame is EX, not H.EX
 
 local percent = nil
 local diffuse = nil

@@ -5,7 +5,7 @@ local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(player)
 
 -- H.EX (10ms) score marquee support (see the index==1 block below)
 local HEX_COLOR = color("#FF4FCB")
-local show10 = true
+local show10 = false -- false so the first frame is EX, not H.EX
 
 local TapNoteScores = {
 	Types = { 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'Miss' },

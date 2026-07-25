@@ -5,7 +5,7 @@ local stats = STATSMAN:GetCurStageStats():GetPlayerStageStats(pn)
 
 -- H.EX (10ms) label marquee support (see the index==1 block below)
 local HEX_COLOR = color("#FF4FCB")
-local show10 = true
+local show10 = false -- false so the first frame is EX, not H.EX
 
 local firstToUpper = function(str)
     return (str:gsub("^%l", string.upper))
