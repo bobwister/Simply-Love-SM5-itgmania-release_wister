@@ -74,6 +74,13 @@ end
 Branch.AfterScreenSelectColor = function()
 	local preferred_style = ThemePrefs.Get("AutoStyle")
 
+	-- "Allow Select game mode" = No: force Single instead of showing ScreenSelectStyle,
+	-- the same way AutoStyle already forces a specific style. Only kicks in when AutoStyle
+	-- itself isn't already dictating a style.
+	if preferred_style == "none" and not ThemePrefs.Get("AllowScreenSelectStyle") then
+		preferred_style = "single"
+	end
+
 	if preferred_style ~= "none"
 	-- AutoStyle should not be possible in pay mode
 	-- it's too confusing for machine operators, novice players, and developers alike
@@ -96,10 +103,38 @@ Branch.AfterScreenSelectColor = function()
 		-- the engine, but I guess we're doing it here, in SL-Branches.lua, for now.
 		GAMESTATE:SetCurrentStyle( preferred_style )
 
-		return "ScreenSelectPlayMode"
+		return Branch.AllowScreenSelectCasual()
 	end
 
 	return "ScreenSelectStyle"
+end
+
+-- "Allow Select casual" = No: skip the Casual/ITG screen (ScreenSelectPlayMode),
+-- defaulting to ITG. Mirrors what that screen's own underlay OffCommand does
+-- when the player actually picks ITG (Scripts/SL-Helpers.lua's SetGameModePreferences,
+-- BGAnimations/ScreenSelectPlayMode underlay/default.lua).
+Branch.AllowScreenSelectCasual = function()
+	if ThemePrefs.Get("AllowScreenSelectCasual") then
+		return "ScreenSelectPlayMode"
+	end
+
+	SL.Global.GameMode = "ITG"
+	SetGameModePreferences()
+
+	return Branch.AllowScreenSelectMarathon()
+end
+
+-- "Allow Select Marathon" = No: skip the Regular/Marathon screen
+-- (ScreenSelectPlayMode2), defaulting to Regular. Also used directly from
+-- metrics.ini's ChoiceITG so the skip applies even when the Casual/ITG
+-- screen itself was shown and the player picked ITG.
+Branch.AllowScreenSelectMarathon = function()
+	if ThemePrefs.Get("AllowScreenSelectMarathon") then
+		return "ScreenSelectPlayMode2"
+	end
+
+	GAMESTATE:SetCurrentPlayMode('PlayMode_Regular')
+	return "ScreenProfileLoad"
 end
 
 Branch.AfterEvaluationStage = function()
