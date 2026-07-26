@@ -46,3 +46,17 @@ end
 DimColor = function(c, mult, alpha)
 	return { c[1]*mult, c[2]*mult, c[3]*mult, alpha }
 end
+
+-- Shared look for the ScreenSelectMusic left-column panels (song description,
+-- density graph, pattern info, difficulty grid). They all used #1e282f at alpha
+-- 0.5 under the Technique visual style, which let the background video read
+-- straight through and washed the whole column out. One ink and one alpha here
+-- so the column reads as a set of solid cards.
+-- TWEAK: lower HUD_PANEL_ALPHA to let more of the background through.
+HUD_PANEL_COLOR = color("#0E1519")
+HUD_PANEL_ALPHA = 0.90
+
+-- Applies the panel look to a Quad, replacing a per-file diffuse/alpha pair.
+HUDPanel = function(actor)
+	return actor:diffuse(HUD_PANEL_COLOR):diffusealpha(HUD_PANEL_ALPHA)
+end

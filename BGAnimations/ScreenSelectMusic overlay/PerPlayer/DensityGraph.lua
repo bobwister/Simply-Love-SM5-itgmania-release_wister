@@ -101,12 +101,9 @@ local af = Def.ActorFrame{
 -- Background quad for the density graph
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
-		self:diffuse(color("#1e282f")):zoomto(width, height)
+		HUDPanel(self):zoomto(width, height)
 		if ThemePrefs.Get("RainbowMode") then
 			self:diffusealpha(0.9)
-		end
-		if ThemePrefs.Get("VisualStyle") == "Technique" then
-			self:diffusealpha(0.5)
 		end
 	end
 }
@@ -267,7 +264,9 @@ af2[#af2+1] = Def.ActorFrame{
 	Def.Quad{
 		InitCommand=function(self)
 			local bgHeight = 17
-			self:diffuse(color("#000000")):zoomto(width, bgHeight):diffusealpha(0.5)
+			-- caption strip under the graph; kept a touch darker than the panels
+			-- behind it so the peak-NPS text reads against the graph
+			self:diffuse(color("#05080A")):zoomto(width, bgHeight):diffusealpha(0.75)
 		end
 	},
 
@@ -353,10 +352,7 @@ af2[#af2+1] = Def.ActorFrame{
 	-- Only shown in 1 Player mode
 	Def.Quad{
 		InitCommand=function(self)
-			self:addy(-4):diffuse(color("#1e282f")):zoomto(width, height-10)
-			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				self:diffusealpha(0.5)
-			end
+			HUDPanel(self):addy(-4):zoomto(width, height-10)
 		end,
 	}
 }

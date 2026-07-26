@@ -46,12 +46,9 @@ local t = Def.ActorFrame{
 t[#t+1] = Def.Quad{
 	Name="Background",
 	InitCommand=function(self)
-		self:diffuse(color("#1e282f")):zoomto(32,152)
+		HUDPanel(self):zoomto(32,152)
 		if ThemePrefs.Get("RainbowMode") then
 			self:diffusealpha(0.9)
-		end
-		if ThemePrefs.Get("VisualStyle") == "Technique" then
-			self:diffusealpha(0.5)
 		end
 	end
 }

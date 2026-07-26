@@ -14,13 +14,22 @@ local stepstype = GAMESTATE:GetCurrentStyle():GetStepsType()
 local IsNotWide = (GetScreenAspectRatio() < 16/9)
 
 -- Right-aligned data columns at the end of each row, reading left to right:
--- points, global ITL rank, EX score. TWEAK: these three numbers are the only
--- thing controlling the horizontal spacing of that group; all are offsets from
--- the row's right edge, so lowering a value moves that column right.
-local ITL_ANCHOR = _screen.w/(WideScale(2.15, 2.14))
-local ITL_COL_PTS  = ITL_ANCHOR - 132
-local ITL_COL_RANK = ITL_ANCHOR - 74
-local ITL_COL_EX   = ITL_ANCHOR - 16
+-- points, global ITL rank, EX score.
+--
+-- The row plate spans 0 .. item_width from the frame origin, so anchoring to
+-- item_width puts the group hard against the row's right edge instead of
+-- leaving the ~36px of dead margin the old _screen.w/2.14 anchor did.
+--
+-- TWEAK: ITL_ZOOM is the size of these numbers. Enlarging them eats into the
+-- song title, whose maxwidth is set in metrics.ini under [TextBanner] and has
+-- to stay clear of ITL_BLOCK_LEFT below -- the two are a trade-off.
+local ITL_ZOOM = 0.28
+local ITL_ANCHOR   = item_width - 14
+local ITL_COL_EX   = ITL_ANCHOR
+local ITL_COL_RANK = ITL_ANCHOR - 38
+local ITL_COL_PTS  = ITL_ANCHOR - 80
+-- Left edge of the whole group, i.e. where the title has to stop.
+local ITL_BLOCK_LEFT = ITL_COL_PTS - 40
 -- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
 -- treatment already used on the evaluation screen.
 local ITL_LABEL_COLOR = color("#5A6166")
@@ -78,8 +87,10 @@ end
 af[#af+1] = Def.Sprite{
 	Texture=THEME:GetPathG("", "Has Edit (doubleres).png"),
 	InitCommand=function(self)
-		self:horizalign(left):visible(false):zoom(0.375)
-		self:x( _screen.w/(WideScale(2.15, 2.14)) - self:GetWidth()*self:GetZoom() - 8 )
+		-- sits immediately left of the points/rank/EX group, which now runs to
+		-- the row's right edge
+		self:horizalign(right):visible(false):zoom(0.375)
+		self:x( ITL_BLOCK_LEFT - 6 )
 
 		if DarkUI() then self:diffuse(0,0,0,1) end
 	end,
@@ -99,7 +110,7 @@ for player in ivalues(PlayerNumber) do
 		Text="",
 		InitCommand=function(self)
 			self:visible(false):horizalign(right)
-			self:zoom(0.2)
+			self:zoom(ITL_ZOOM)
 			self:x( ITL_COL_EX )
 			self:diffuse(SL.JudgmentColors["FA+"][player == "PlayerNumber_P1" and 1 or 2])
 		end,
@@ -236,7 +247,7 @@ af[#af+1] = Def.BitmapText{
 	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 	Text="",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(0.2):y(7)
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(7)
 		self:x( ITL_COL_PTS )
 		self.hash = nil
 	end,
@@ -300,7 +311,7 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(0.2):y(7)
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(7)
 		self:x( ITL_COL_RANK )
 		self.hash = nil
 	end,
