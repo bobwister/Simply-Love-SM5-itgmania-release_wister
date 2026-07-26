@@ -27,13 +27,18 @@ return Def.ActorFrame{
 				self:diffuse(GetCurrentColor(true))
 			end
 			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				if topscreen == "ScreenSelectMusic" and not ThemePrefs.Get("RainbowMode") then
-					self:diffuse(0, 0, 0, 0.5)
-				else
-					self:diffusealpha(0)
-				end
+				self:diffusealpha(0)
 			end
-			self:visible(topscreen ~= "ScreenCRTTestPatterns")
+
+			-- ScreenSelectMusic draws its own header band, inside the overlay, in
+			-- BGAnimations/ScreenSelectMusic overlay/PackRail.lua -- for the same
+			-- reason the footer does (see Graphics/_footer.lua): the engine sorts a
+			-- screen's children by draw order once, at Init, so the metrics force
+			-- this quad to 101 and it would cover the overlay content that belongs
+			-- on top of it. The header's own text stays above the overlay band
+			-- because it is a sibling of this quad, still at 101.
+			self:visible(topscreen ~= "ScreenCRTTestPatterns"
+			         and topscreen ~= "ScreenSelectMusic")
 		end,
 		ColorSelectedMessageCommand=function(self)
 			if ThemePrefs.Get("VisualStyle") == "SRPG8" then

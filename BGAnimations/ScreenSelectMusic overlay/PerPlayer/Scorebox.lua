@@ -471,6 +471,7 @@ local af = Def.ActorFrame{
 		self:GetChild("ITLLogo"):visible(true)
 		self:GetChild("Outline"):visible(true)
 		self:GetChild("Background"):linear(transition_seconds/2):diffusealpha(body_alpha):visible(true)
+		self:GetChild("CardDecor"):linear(transition_seconds/2):diffusealpha(1):visible(true)
 		
 		local start = cur_style
 
@@ -570,6 +571,7 @@ local af = Def.ActorFrame{
 				self:GetParent():GetChild("ITLLogo"):diffusealpha(0):visible(false)
 				self:GetParent():GetChild("Outline"):diffusealpha(0):visible(false)
 				self:GetParent():GetChild("Background"):diffusealpha(0):visible(false)
+				self:GetParent():GetChild("CardDecor"):diffusealpha(0):visible(false)
 				
 				if IsItlSong(player) then
 					UpdatePathMap(player, SL[pn].Streams.Hash)
@@ -736,9 +738,52 @@ local af = Def.ActorFrame{
 	},
 }
 
+-- Corner brackets, the same device as the left-column cards
+-- (HUDCardDecor in Scripts/SL-Helpers-WheelPlate.lua). Added before the rows so
+-- it sits over the body but under the text.
+-- Shown and hidden in lockstep with Background/Outline below, so the brackets
+-- can't be left floating over empty space while a request is in flight.
+af[#af+1] = HUDCardDecor(width, height, 0, 0)..{
+	Name="CardDecor",
+	ResetCommand=function(self) self:stoptweening() end,
+	OffCommand=function(self) self:stoptweening() end
+}
+
 for i=1,NumEntries do
 	local y = -height/2 + 16 * i - 8
 	local zoom = 0.87
+
+	-- Band marking the player's own entry. The 80px box holds five 16px rows
+	-- with no headroom for a header, so "which row is me" is carried by a filled
+	-- band behind the row rather than by a label. Reads the same isSelf flag the
+	-- name and score actors use for their text colour.
+	af[#af+1] = Def.Quad{
+		Name="SelfBand"..i,
+		InitCommand=function(self)
+			self:setsize(width - 4, 15):xy(0, y)
+			self:diffuse(self_color):diffusealpha(0)
+			if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
+				self:setsize(width - 44, 15)
+			end
+		end,
+		PlayerJoinedMessageCommand=function(self)
+			self:setsize(IsNotWide and (width - 44) or (width - 4), 15)
+		end,
+		PlayerUnjoinedMessageCommand=function(self)
+			self:setsize(width - 4, 15)
+		end,
+		LoopScoreboxCommand=function(self)
+			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
+		end,
+		SetScoreboxCommand=function(self)
+			local score = all_data[cur_style+1]["scores"][i]
+			if score.isSelf then
+				self:linear(transition_seconds/2):diffusealpha(0.16)
+			end
+		end,
+		ResetCommand=function(self) self:stoptweening() end,
+		OffCommand=function(self) self:stoptweening() end
+	}
 
 	-- Rank 1 gets a crown.
 	if i == 1 then

@@ -76,6 +76,10 @@ local af = Def.ActorFrame{
 	-- the GrooveStats connection light.
 	LoadActor("./Footer.lua"),
 
+	-- Pack Rail in the header's centre band: current pack with its neighbours,
+	-- and ctrl+Left/Right to jump between packs.
+	LoadActor("./PackRail.lua"),
+
 	-- ---------------------------------------------------
 	-- finally, load the overlay used for sorting the MusicWheel (and more), hidden by default
 	LoadActor("./SortMenu/default.lua"),
