@@ -8,7 +8,7 @@ local footer_height = 32
 -- height of the PaneDisplay in pixels
 local pane_height = 60
 
-local text_zoom = WideScale(0.8, 0.9)
+local text_zoom = WideScale(0.58, 0.65)
 
 -- "Technique HUD": the pane is a dark card now rather than a difficulty-colored
 -- slab, so its text is light. Kept as constants because this file sets the
@@ -282,9 +282,48 @@ end
 
 -- -----------------------------------------------------------------------
 -- define the x positions of four columns, and the y positions of three rows of PaneItems
+-- Column anchors, as fractions of the pane's half width so 4:3 and 16:9 both fall
+-- out of one set of numbers rather than two hand-tuned WideScale pairs.
+--
+-- Every stat prints as "<value> <label>": the value is right-aligned ON its anchor and
+-- the label starts 3px after it. Values are bright, labels dim -- a dozen numbers in a
+-- 60px strip only reads if the words recede behind the figures.
+local pane_hw = (_screen.w/2 - 10) / 2
+
 local pos = {
-	col = { WideScale(-104,-133), WideScale(-36,-38), WideScale(54,76), WideScale(150, 190) },
-	row = { 13, 31, 49 }
+	row = { 13, 31, 49 },
+
+	-- chart counts: two sub-columns over three rows
+	radar = { -0.72 * pane_hw, -0.355 * pane_hw },
+	-- technical counts: two sub-columns, five slots used
+	tech  = { -0.03 * pane_hw,  0.22 * pane_hw },
+	-- total stream sits alone on the last row, so it can be as wide as it needs
+	stream = 0.72 * pane_hw,
+	-- the two high scores
+	sc_label = 0.335 * pane_hw,
+	sc_name  = 0.58  * pane_hw,
+	sc_pct   = 0.985 * pane_hw,
+	-- GrooveStats rivals borrow the technical columns' space -- see show_rivals below
+	rv_name = -0.03 * pane_hw,
+	rv_pct  =  0.30 * pane_hw,
+}
+
+-- The pane cannot hold both the technical counts and three rival scores. Rivals only
+-- exist in "Pane" mode, where the two scores are GrooveStats data rather than local
+-- machine/profile bests, so that mode gets the rivals and this one gets the counts.
+local show_rivals = (ThemePrefs.Get("MusicWheelGS") == "Pane")
+
+-- Two-letter abbreviations for the technical counts, keyed by their SL[pn].Streams
+-- field. These used to live in a separate PatternInfo panel tucked under the density
+-- graph, spelled out in full; they are folded in here so the difficulty picker can have
+-- that band instead.
+-- TWEAK: the labels printed in the pane.
+local TECH_STATS = {
+	{ key="Crossovers",   label="XO" },
+	{ key="Footswitches", label="FS" },
+	{ key="Sideswitches", label="SS" },
+	{ key="Jacks",        label="JA" },
+	{ key="Brackets",     label="BR" },
 }
 
 local num_rows = 3
@@ -501,7 +540,7 @@ for player in ivalues(PlayerNumber) do
 			LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				InitCommand=function(self)
 					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
-					self:x(pos.col[col])
+					self:x(pos.radar[col])
 					self:y(pos.row[row])
 				end,
 
@@ -522,8 +561,8 @@ for player in ivalues(PlayerNumber) do
 			LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				Text=item.name,
 				InitCommand=function(self)
-					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(left)
-					self:x(pos.col[col]+3)
+					self:zoom(text_zoom):diffuse(HUD_LABEL):horizalign(left)
+					self:x(pos.radar[col]+3)
 					self:y(pos.row[row])
 				end
 			},
@@ -534,8 +573,8 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="MachineHighScoreName",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
-			self:x(pos.col[3]-50*text_zoom)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(34):horizalign(left)
+			self:x(pos.sc_name)
 			self:y(pos.row[1])
 		end,
 		SetCommand=function(self)
@@ -560,7 +599,7 @@ for player in ivalues(PlayerNumber) do
 		Name="MachineHighScore",
 		InitCommand=function(self)
 			self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
-			self:x(pos.col[3]+25*text_zoom)
+			self:x(pos.sc_pct)
 			self:y(pos.row[1])
 		end,
 		SetCommand=function(self)
@@ -587,8 +626,8 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="PlayerHighScoreName",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
-			self:x(pos.col[3]-50*text_zoom)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(34):horizalign(left)
+			self:x(pos.sc_name)
 			self:y(pos.row[2])
 		end,
 		SetCommand=function(self)
@@ -612,7 +651,7 @@ for player in ivalues(PlayerNumber) do
 		Name="PlayerHighScore",
 		InitCommand=function(self)
 			self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
-			self:x(pos.col[3]+25*text_zoom)
+			self:x(pos.sc_pct)
 			self:y(pos.row[2])
 		end,
 		SetCommand=function(self)
@@ -639,7 +678,7 @@ for player in ivalues(PlayerNumber) do
 		Text="Loading ... ",
 		InitCommand=function(self)
 			self:zoom(text_zoom):diffuse(PANE_TEXT)
-			self:x(pos.col[3]-15)
+			self:x(pos.sc_label)
 			self:y(pos.row[3])
 			self:visible(false)
 		end,
@@ -649,39 +688,101 @@ for player in ivalues(PlayerNumber) do
 		end
 	}
 
-	-- Chart Difficulty Meter
-	af2[#af2+1] = LoadFont("Wendy/_wendy small")..{
-		Name="DifficultyMeter",
-		InitCommand=function(self)
-			self:horizalign(right):diffuse(PANE_TEXT)
-			self:xy(pos.col[4], pos.row[2])
-			if not IsUsingWideScreen() then self:maxwidth(66) end
-			self:queuecommand("Set")
-		end,
-		SetCommand=function(self)
-			-- Hide the difficulty number if we're connected.
-			if IsServiceAllowed(SL.GrooveStats.GetScores) then
-				self:visible(false)
+	-- The chart's difficulty meter used to be printed here as a large Wendy number.
+	-- It is gone: the difficulty picker (StepsDisplayList/Grid.lua) now shows all five
+	-- meters as chips a few pixels above this pane, so this was the same number twice.
+
+	-- Labels for the two score rows. The pane used to print two anonymous
+	-- "---- ??.??%" pairs with nothing to say which was the machine's and which the
+	-- player's own profile.
+	for i, key in ipairs({"MachineScore", "ProfileScore"}) do
+		af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+			Text=THEME:GetString("ScreenSelectMusic", key),
+			InitCommand=function(self)
+				self:zoom(text_zoom):diffuse(HUD_LABEL):horizalign(left)
+				self:xy(pos.sc_label, pos.row[i])
 			end
+		}
+	end
 
-			local SongOrCourse, StepsOrTrail = GetSongAndSteps(player)
-			if not SongOrCourse then self:settext("") return end
-			local meter = StepsOrTrail and StepsOrTrail:GetMeter() or "?"
+	-- Technical counts, folded in from the PatternInfo panel that used to sit under the
+	-- density graph. Five slots: two per row for the first two rows, one on the third,
+	-- which leaves the third row's second column clear for the stream ratio.
+	--
+	-- These come from the chart parser rather than from radar values, and parsing is
+	-- deferred (DensityGraph.lua stalls 0.4s before it runs) -- so they refresh on the
+	-- parser's own <pn>ChartParsed broadcast, not on the pane's generic Set. Listening
+	-- to Set would read SL[pn].Streams before it had been filled in.
+	if not show_rivals and not GAMESTATE:IsCourseMode() then
 
-			self:settext( meter )
+		af2[pn.."ChartParsingMessageCommand"] = function(self) self:playcommand("ClearTech") end
+		af2[pn.."ChartParsedMessageCommand"]  = function(self) self:playcommand("SetTech") end
+
+		for i, stat in ipairs(TECH_STATS) do
+			local col = ((i-1) % 2) + 1
+			local row = math.floor((i-1)/2) + 1
+
+			af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+				Name=stat.key.."Value",
+				Text="",
+				InitCommand=function(self)
+					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
+					self:xy(pos.tech[col], pos.row[row])
+				end,
+				ClearTechCommand=function(self) self:settext("") end,
+				SetTechCommand=function(self)
+					self:settext( SL[pn].Streams[stat.key] or 0 )
+				end
+			}
+
+			af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+				Text=stat.label,
+				InitCommand=function(self)
+					self:zoom(text_zoom):diffuse(HUD_LABEL):horizalign(left)
+					self:xy(pos.tech[col]+3, pos.row[row])
+				end
+			}
 		end
-	}
+
+		-- Total stream: measures of stream over total measures, with the percentage.
+		af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+			Name="TotalStreamValue",
+			Text="",
+			InitCommand=function(self)
+				self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
+				self:xy(pos.stream, pos.row[3])
+			end,
+			ClearTechCommand=function(self) self:settext("") end,
+			SetTechCommand=function(self)
+				local streamMeasures, breakMeasures = GetTotalStreamAndBreakMeasures(pn)
+				local total = streamMeasures + breakMeasures
+				if streamMeasures == 0 or total == 0 then
+					self:settext("0%")
+				else
+					self:settext( ("%d/%d %.1f%%"):format(streamMeasures, total, streamMeasures/total*100) )
+				end
+			end
+		}
+
+		af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+			Text=THEME:GetString("ScreenSelectMusic", "TotalStream"),
+			InitCommand=function(self)
+				self:zoom(text_zoom):diffuse(HUD_LABEL):horizalign(left)
+				self:xy(pos.stream+3, pos.row[3])
+			end
+		}
+	end
 
 	-- Add actors for Rival score data. Hidden by default
 	-- We position relative to column 3 for spacing reasons.
-	if ThemePrefs.Get("MusicWheelGS") == "Pane" then
+	if show_rivals then
 		for i=1,3 do
 			-- Rival Machine Tag
 			af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				Name="Rival"..i.."Name",
 				InitCommand=function(self)
 					self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
-					self:x(pos.col[3]+50*text_zoom)
+					self:x(pos.rv_name)
 					self:y(pos.row[i])
 				end,
 				OnCommand=function(self)
@@ -697,7 +798,7 @@ for player in ivalues(PlayerNumber) do
 				Name="Rival"..i.."Score",
 				InitCommand=function(self)
 					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
-					self:x(pos.col[3]+125*text_zoom)
+					self:x(pos.rv_pct)
 					self:y(pos.row[i])
 				end,
 				OnCommand=function(self)

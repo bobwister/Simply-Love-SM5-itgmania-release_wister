@@ -13,9 +13,10 @@ for player in ivalues( PlayerNumber ) do
 	t[#t+1] = LoadActor("./ScoreBox.lua", player)
 end
 
--- Bouncing cursor inside the grid of difficulty blocks. These should be on top of both of the other elements.
-for player in ivalues( PlayerNumber ) do
-	t[#t+1] = LoadActor("./Cursor.lua", player)
-end
+-- The per-player difficulty cursor used to be loaded here. It lives inside the
+-- difficulty picker's own frame now (StepsDisplayList/Grid.lua) because it became a
+-- highlight ring drawn around the selected chip: it has to land between that card's
+-- opaque background and the chips themselves, and everything in this file draws
+-- underneath the whole StepsDisplayList.
 
 return t

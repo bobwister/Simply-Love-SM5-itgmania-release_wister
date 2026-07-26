@@ -7,14 +7,27 @@ local bannerWidth = 418
 local bannerHeight = 164
 
 local t = Def.ActorFrame{
+	-- Position and zoom both come from Scripts/SL-Layout-SelectMusic.lua: this banner
+	-- sets the width of every card in the left column, so the two cannot be allowed to
+	-- drift apart. Children are laid out in pre-zoom units and scale with the frame.
 	OnCommand=function(self)
-		if IsUsingWideScreen() then
-			self:zoom(0.7655)
-			self:xy(_screen.cx - 170, 96)
-		else
-			self:zoom(0.75)
-			self:xy(_screen.cx - 166, 96)
-		end
+		self:zoom(SSM.banner_zoom)
+		self:xy(SSM.column.cx, SSM.cards.banner.cy)
+	end
+}
+
+-- Hairline frame around the banner art, in the player's color.
+--
+-- Drawn first and 2px larger on every side, so it survives as a ring once the art
+-- covers its middle. One ring serves both the fallback sprite and the ActorProxy: the
+-- screen's own Banner actor is scaletoclipped to 418x164 by [ScreenSelectMusic]
+-- BannerOnCommand, the same dimensions the fallback sprite is set to below, and the
+-- metric parks it at BannerX/Y 0 so the proxy adds no offset of its own.
+t[#t+1] = Def.Quad{
+	Name="BannerFrame",
+	InitCommand=function(self)
+		self:setsize(bannerWidth + 4, bannerHeight + 4)
+		self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.45) )
 	end
 }
 
@@ -58,12 +71,12 @@ t[#t+1] = Def.ActorFrame{
 
 	--quad behind the music rate text
 	Def.Quad{
-		InitCommand=function(self) self:diffuse( color("#1E282FCC") ):zoomto(418,14) end
+		InitCommand=function(self) HUDPanel(self):zoomto(418,14) end
 	},
 
 	--the music rate text
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:shadowlength(1):zoom(0.85) end,
+		InitCommand=function(self) self:shadowlength(1):zoom(0.85):diffuse(HUD_TEXT) end,
 		OnCommand=function(self)
 			self:settext(("%g"):format(SL.Global.ActiveModifiers.MusicRate) .. "x " .. THEME:GetString("OptionTitles", "MusicRate"))
 		end

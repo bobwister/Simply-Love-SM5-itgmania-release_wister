@@ -8,7 +8,7 @@ local pn = ToEnumShortString(player)
 
 -- Height and width of the density graph.
 local height = 64
-local width = IsUsingWideScreen() and 286 or 276
+local width = SSM.column.w
 
 local marquee_index
 local text_table = {}
@@ -30,9 +30,9 @@ local showPatternInfo = false
 local af = Def.ActorFrame{
 	InitCommand=function(self)
 		self:visible( GAMESTATE:IsHumanPlayer(player) )
-		self:x(_screen.cx-182)
+		self:x(SSM.column.cx)
 		if #GAMESTATE:GetHumanPlayers() == 1 then 
-			self:y(_screen.cy+62)
+			self:y(SSM.cards.density.cy)
 		else
 			self:y(_screen.cy+23)
 		end
@@ -41,14 +41,11 @@ local af = Def.ActorFrame{
 			self:addy(height+24)
 		end
 
-		if IsUsingWideScreen() then
-			self:addx(-5)
-		end
 	end,
 	PlayerJoinedMessageCommand=function(self, params)
-		self:x(_screen.cx-182)
+		self:x(SSM.column.cx)
 		if #GAMESTATE:GetHumanPlayers() == 1 then 
-			self:y(_screen.cy+62)
+			self:y(SSM.cards.density.cy)
 
 		else
 			self:y(_screen.cy+23)
@@ -57,23 +54,17 @@ local af = Def.ActorFrame{
 			self:addy(height+24)
 		end
 
-		if IsUsingWideScreen() then
-			self:addx(-5)
-		end
 		if params.Player == player then
 			self:visible(true)
 		end
 	end,
 	PlayerUnjoinedMessageCommand=function(self, params)
-		self:x(_screen.cx-182)
-		self:y(_screen.cy+62)
+		self:x(SSM.column.cx)
+		self:y(SSM.cards.density.cy)
 		if player == PLAYER_2 then
 			self:addy(height+24)
 		end
 
-		if IsUsingWideScreen() then
-			self:addx(-5)
-		end
 		if params.Player == player then
 			self:visible(false)
 		end
@@ -84,15 +75,11 @@ local af = Def.ActorFrame{
 		end
 	end,
 	CodeMessageCommand=function(self, params)
-		-- Toggle between the density graph and the pattern info
-		if params.Name == "TogglePatternInfo" and params.PlayerNumber == player then
-			-- Only need to toggle in versus since in single player modes, both
-			-- panes are already displayed.
-			if GAMESTATE:GetNumSidesJoined() == 2 then
-				showPatternInfo = not showPatternInfo
-				self:queuecommand("TogglePatternInfo")
-			end
-		elseif (params.Name == "CloseFolder1" or params.Name == "CloseFolder2" or params.Name == "CloseFolder3") and params.Name == ThemePrefs.Get("CloseFolderCodes") then
+		-- The TogglePatternInfo code used to swap the density graph out for the pattern
+		-- counts. Those are permanently visible in the stats pane now, so there is
+		-- nothing left to swap to and the code is ignored. showPatternInfo stays false
+		-- forever, which is what the visible(not showPatternInfo) calls below rely on.
+		if (params.Name == "CloseFolder1" or params.Name == "CloseFolder2" or params.Name == "CloseFolder3") and params.Name == ThemePrefs.Get("CloseFolderCodes") then
 			CloseFolder()
 		end
 	end,
@@ -334,119 +321,10 @@ af2[#af2+1] = Def.ActorFrame{
 	}
 }
 
-af2[#af2+1] = Def.ActorFrame{
-	Name="PatternInfo",
-	InitCommand=function(self)
-		if GAMESTATE:GetNumSidesJoined() == 2 then
-			self:y(0)
-		else
-			if player == PLAYER_1 then
-				self:y(38 + 24)
-			else
-				self:y(-38 - 80)
-			end
-		end
-		self:visible(GAMESTATE:GetNumSidesJoined() == 1)
-	end,
-	PlayerJoinedMessageCommand=function(self, params)
-		self:visible(GAMESTATE:GetNumSidesJoined() == 1)
-		if GAMESTATE:GetNumSidesJoined() == 2 then
-			self:y(0)
-		else
-			if player == PLAYER_1 then
-				self:y(38 + 24)
-			else
-				self:y(-38 - 80)
-			end
-		end
-	end,
-	PlayerUnjoinedMessageCommand=function(self, params)
-		self:visible(GAMESTATE:GetNumSidesJoined() == 1)
-		if player == PLAYER_1 then
-			self:y(38 + 24)
-		else
-			self:y(-38 - 80)
-		end
-	end,
-	TogglePatternInfoCommand=function(self)
-		self:visible(showPatternInfo)
-	end,
-	
-	-- Background for the additional chart info.
-	-- Only shown in 1 Player mode.
-	-- No card brackets of its own: this sits inside the density panel's footprint
-	-- (same width, 10px shorter), so that panel's brackets already frame it and a
-	-- second set 9px away would just read as a doubled edge.
-	Def.Quad{
-		InitCommand=function(self)
-			HUDPanel(self):addy(-4):zoomto(width, height-10)
-		end,
-	}
-}
-
-local af3 = af2[#af2]
-
-local layout = {
-	{"Crossovers", "Footswitches"},
-	{"Sideswitches", "Jacks"},
-	{"Brackets", "Total Stream"},
-}
-
-local colSpacing = 170
-local rowSpacing = 17
-
-for i, row in ipairs(layout) do
-	for j, col in pairs(row) do
-		af3[#af3+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-			Text=col ~= "Total Stream" and "0" or "None (0.0%)",
-			Name=col .. "Value",
-			InitCommand=function(self)
-				local textHeight = 17
-				local textZoom = 0.85
-				self:zoom(textZoom):horizalign(right)
-				if col == "Total Stream" then
-					self:maxwidth(100)
-				end
-				self:xy(-width/2 + 26, -height/2 + 10)
-				self:addx((j-1)*colSpacing)
-				self:addy((i-1)*rowSpacing)
-			end,
-			HideCommand=function(self)
-				if col ~= "Total Stream" then
-					self:settext("0")
-				else
-					self:settext("None (0.0%)")
-				end
-			end,
-			RedrawCommand=function(self)
-				if col ~= "Total Stream" then
-					self:settext(SL[pn].Streams[col])
-				else
-					local streamMeasures, breakMeasures = GetTotalStreamAndBreakMeasures(pn)
-					local totalMeasures = streamMeasures + breakMeasures
-					if streamMeasures == 0 then
-						self:settext("None (0.0%)")
-					else
-						self:settext(string.format("%d/%d (%0.2f%%)", streamMeasures, totalMeasures, streamMeasures/totalMeasures*100))
-					end
-				end
-			end
-		}
-
-		af3[#af3+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-			Text=col,
-			Name=col,
-			InitCommand=function(self)
-				local textHeight = 17
-				local textZoom = 0.9
-				self:maxwidth(width/textZoom):zoom(textZoom):horizalign(left)
-				self:xy(-width/2 + 30, -height/2 + 10)
-				self:addx((j-1)*colSpacing)
-				self:addy((i-1)*rowSpacing)
-			end,
-		}
-
-	end
-end
+-- The PatternInfo panel used to sit here: a 320x54 card holding Crossovers,
+-- Footswitches, Sideswitches, Jacks, Brackets and Total Stream, occupying y 333..387.
+-- Those six stats moved into the merged stats pane (PaneDisplay.lua), which frees this
+-- band for the difficulty picker -- there was no free space in the column otherwise.
+-- The pane refreshes them off the <pn>ChartParsed broadcast above.
 
 return af

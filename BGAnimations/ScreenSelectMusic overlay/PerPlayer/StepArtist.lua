@@ -78,7 +78,11 @@ return Def.ActorFrame{
 				self:y(_screen.cy + 32)
 			else
 				self:x( _screen.cx - (IsUsingWideScreen() and 356 or 346))
-				self:y(_screen.cy + 12)
+				-- Vertical band from Scripts/SL-Layout-SelectMusic.lua. Two offsets have
+				-- to be undone to land on it: the card quad below hangs 18px under this
+				-- frame's origin, and the AppearP1 tween lifts the whole frame 30px on
+				-- entry, so the frame has to start 30px below where it settles.
+				self:y( SSM.cards.artist.cy - 18 + 30 )
 			end
 
 		elseif player == PLAYER_2 then

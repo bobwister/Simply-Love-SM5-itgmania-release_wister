@@ -1,12 +1,13 @@
 local MusicWheel, SelectedType
 local group_durations = LoadActor("./GroupDurations.lua")
 
--- width of background quad
-local _w = IsUsingWideScreen() and 320 or 310
+-- width of background quad -- the shared column width, so this card lines up with the
+-- banner above it and the density graph below (Scripts/SL-Layout-SelectMusic.lua)
+local _w = SSM.column.w
 
 local af = Def.ActorFrame{
 	OnCommand=function(self)
-		self:xy(_screen.cx - (IsUsingWideScreen() and 170 or 165), _screen.cy - 55)
+		self:xy(SSM.column.cx, SSM.cards.song.cy)
 	end,
 
 	CurrentSongChangedMessageCommand=function(self)    self:playcommand("Set") end,
@@ -29,6 +30,17 @@ af[#af+1] = Def.Quad{
 
 af[#af+1] = HUDCardDecor(_w, 50)
 
+-- Hairline splitting the card into its two rows: who wrote the song above, how it
+-- plays below. The inner text frame sits at (-100,-6) with the artist line at -11 and
+-- the BPM/length line at +10, so -5 here lands in the gap between them.
+af[#af+1] = Def.Quad{
+	Name="DescriptionRule",
+	InitCommand=function(self)
+		self:zoomto(_w - 24, 1):y(-5)
+		self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.20) )
+	end
+}
+
 -- ActorFrame for Artist, BPM, and Song length
 af[#af+1] = Def.ActorFrame{
 	InitCommand=function(self) self:xy(-100,-6) end,
@@ -37,12 +49,12 @@ af[#af+1] = Def.ActorFrame{
 	-- Artist Label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", GAMESTATE:IsCourseMode() and "NumSongs" or "Artist"):upper(),
-		InitCommand=function(self) self:align(1,0):y(-11):maxwidth(44):diffuse(0.5,0.5,0.5,1) end,
+		InitCommand=function(self) self:align(1,0):y(-11):maxwidth(44):diffuse(HUD_LABEL) end,
 	},
 
 	-- Song Artist (or number of Songs in this Course, if CourseMode)
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:align(0,0):xy(5,-11) end,
+		InitCommand=function(self) self:align(0,0):xy(5,-11):diffuse(HUD_TEXT) end,
 		SetCommand=function(self)
 			local maxwidth = _w - 60
 
@@ -68,7 +80,7 @@ af[#af+1] = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", "BPM"):upper(),
 		InitCommand=function(self)
-			self:align(1,0):y(10):diffuse(0.5,0.5,0.5,1)
+			self:align(1,0):y(10):diffuse(HUD_LABEL)
 		end
 	},
 
@@ -77,7 +89,7 @@ af[#af+1] = Def.ActorFrame{
 		InitCommand=function(self)
 			-- vertical align has to be middle for BPM value in case of split BPMs having a line break
 			self:align(0, 0.5)
-			self:xy(5,17):diffuse(1,1,1,1):vertspacing(-8)
+			self:xy(5,17):diffuse(HUD_TEXT):vertspacing(-8)
 		end,
 		SetCommand=function(self)
 
@@ -112,8 +124,8 @@ af[#af+1] = Def.ActorFrame{
 				-- show the range for both P1 and P2 split by a newline character, shrunk slightly to fit the space
 				self:settext( "P1 ".. p1bpm .. "\n" .. "P2 " .. p2bpm ):zoom(0.8)
 				-- the "P1 " and "P2 " segments of the string should be grey
-				self:AddAttribute(0,             {Length=3, Diffuse={0.60,0.60,0.60,1}})
-				self:AddAttribute(3+p1bpm:len(), {Length=3, Diffuse={0.60,0.60,0.60,1}})
+				self:AddAttribute(0,             {Length=3, Diffuse=HUD_LABEL})
+				self:AddAttribute(3+p1bpm:len(), {Length=3, Diffuse=HUD_LABEL})
 
 				if GAMESTATE:IsCourseMode() then
 					-- P1 and P2's BPM text in CourseMode is white until I have time to figure CourseMode out
@@ -138,14 +150,14 @@ af[#af+1] = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", "Length"):upper(),
 		InitCommand=function(self)
-			self:align(1,0):diffuse(0.5,0.5,0.5,1)
+			self:align(1,0):diffuse(HUD_LABEL)
 			self:x(_w-130):y(10)
 		end
 	},
 
 	-- Song Duration Value
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:align(0,0):xy(_w-130 + 5, 10) end,
+		InitCommand=function(self) self:align(0,0):xy(_w-130 + 5, 10):diffuse(HUD_TEXT) end,
 		SetCommand=function(self)
 			if MusicWheel == nil then MusicWheel = SCREENMAN:GetTopScreen():GetMusicWheel() end
 

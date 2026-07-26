@@ -61,6 +61,13 @@ HUDPanel = function(actor)
 	return actor:diffuse(HUD_PANEL_COLOR):diffusealpha(HUD_PANEL_ALPHA)
 end
 
+-- Two-step text scale for those panels: one near-white for the values you actually
+-- read, one desaturated slate for the labels that name them. Both started life as
+-- literals repeated across the pane display, the step artist box and the footer;
+-- panels styled from here on should use these so the column stays consistent.
+HUD_TEXT  = color("#E8F1F4")
+HUD_LABEL = color("#7C939E")
+
 -- Corner brackets marking out a panel as a HUD card: a two-armed L at the top
 -- left and another at the bottom right, the same device the mockup used.
 --
