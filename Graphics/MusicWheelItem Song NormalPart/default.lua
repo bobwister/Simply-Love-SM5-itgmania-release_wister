@@ -23,7 +23,7 @@ local IsNotWide = (GetScreenAspectRatio() < 16/9)
 -- TWEAK: ITL_ZOOM is the size of these numbers. Enlarging them eats into the
 -- song title, whose maxwidth is set in metrics.ini under [TextBanner] and has
 -- to stay clear of ITL_BLOCK_LEFT below -- the two are a trade-off.
-local ITL_ZOOM = 0.28
+local ITL_ZOOM = 0.35
 local ITL_ANCHOR   = item_width - 14
 local ITL_COL_EX   = ITL_ANCHOR
 local ITL_COL_RANK = ITL_ANCHOR - 38
@@ -33,6 +33,40 @@ local ITL_BLOCK_LEFT = ITL_COL_PTS - 40
 -- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
 -- treatment already used on the evaluation screen.
 local ITL_LABEL_COLOR = color("#5A6166")
+
+-- Best ITG percent this profile holds on a row's song, for the difficulty
+-- currently selected on the wheel. The wheel only tracks one difficulty at a
+-- time, so a row's score is the score on that difficulty's chart -- the same
+-- resolution GetLamp.lua does for the clear lamp, and the same per-row profile
+-- lookup cost. Returns nil when there is no profile, no matching chart, or no
+-- score recorded.
+local function GetItgPercentForSong(player, song)
+	if not song then return nil end
+	if not PROFILEMAN:IsPersistentProfile(player) then return nil end
+
+	local curSteps = GAMESTATE:GetCurrentSteps(player)
+	if not curSteps then return nil end
+
+	local difficulty = curSteps:GetDifficulty()
+	local steps_type = GAMESTATE:GetCurrentStyle():GetStepsType()
+
+	local steps = nil
+	for check in ivalues(song:GetAllSteps()) do
+		if check:GetDifficulty() == difficulty and check:GetStepsType() == steps_type then
+			steps = check
+			break
+		end
+	end
+	if not steps then return nil end
+
+	local list = PROFILEMAN:GetProfile(player):GetHighScoreListIfExists(song, steps)
+	if not list then return nil end
+
+	local scores = list:GetHighScores()
+	if not scores or #scores == 0 then return nil end
+
+	return scores[1]:GetPercentDP() * 100
+end
 
 if ThemePrefs.Get("SongSelectBG") ~= "Off" then
 	af[#af+1] = Def.Sprite{
@@ -303,6 +337,44 @@ af[#af+1] = Def.BitmapText{
 		if self.hash and params.hash == self.hash then
 			self:playcommand("RefreshPoints")
 		end
+	end,
+}
+
+-- ITG score, sitting directly above the EX score in the same right-hand column.
+-- Unlike points/rank/EX this is not ITL data: it is the profile's own best
+-- PercentDP on the row's chart, so it shows on every song, ITL pack or not.
+af[#af+1] = Def.BitmapText{
+	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
+	Text="",
+	Name="ITGScore",
+	InitCommand=function(self)
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(-7)
+		self:x( ITL_COL_EX )
+		self:diffuse(Color.White)
+	end,
+	SetCommand=function(self, params)
+		self:visible(false)
+		self.song = params.Song
+
+		local humans = GAMESTATE:GetHumanPlayers()
+		if #humans ~= 1 then return end
+
+		local percent = GetItgPercentForSong(humans[1], params.Song)
+		if not percent then return end
+
+		local val = ("%.2f"):format(percent)
+		self:settext( val .. " ITG" )
+		self:AddAttribute(#val, { Length=4, Diffuse=ITL_LABEL_COLOR })
+		self:visible(true)
+	end,
+	-- the wheel keeps one difficulty selected at a time, so every row's score
+	-- changes when the player switches difficulty. Both sides are handled
+	-- because solo can be played on either.
+	CurrentStepsP1ChangedMessageCommand=function(self)
+		self:playcommand("Set", { Song=self.song })
+	end,
+	CurrentStepsP2ChangedMessageCommand=function(self)
+		self:playcommand("Set", { Song=self.song })
 	end,
 }
 
