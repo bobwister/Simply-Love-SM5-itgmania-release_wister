@@ -23,11 +23,11 @@ local IsNotWide = (GetScreenAspectRatio() < 16/9)
 -- TWEAK: ITL_ZOOM is the size of these numbers. Enlarging them eats into the
 -- song title, whose maxwidth is set in metrics.ini under [TextBanner] and has
 -- to stay clear of ITL_BLOCK_LEFT below -- the two are a trade-off.
-local ITL_ZOOM = 0.35
+local ITL_ZOOM = 0.40
 local ITL_ANCHOR   = item_width - 14
-local ITL_COL_EX   = ITL_ANCHOR
+local ITL_COL_EX   = ITL_ANCHOR - 24
 local ITL_COL_RANK = ITL_ANCHOR - 38
-local ITL_COL_PTS  = ITL_ANCHOR - 80
+local ITL_COL_PTS  = ITL_ANCHOR - 70
 -- Left edge of the whole group, i.e. where the title has to stop.
 local ITL_BLOCK_LEFT = ITL_COL_PTS - 40
 -- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
@@ -143,7 +143,7 @@ for player in ivalues(PlayerNumber) do
 		Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 		Text="",
 		InitCommand=function(self)
-			self:visible(false):horizalign(right)
+			self:visible(false):horizalign(left)
 			self:zoom(ITL_ZOOM)
 			self:x( ITL_COL_EX )
 			self:diffuse(SL.JudgmentColors["FA+"][player == "PlayerNumber_P1" and 1 or 2])
@@ -162,7 +162,7 @@ for player in ivalues(PlayerNumber) do
 			if GAMESTATE:GetNumSidesJoined() == 1 then
 				-- Solo: only the P1 actor draws, reading from whichever side
 				-- actually holds the profile. Both actors used to render the same
-				-- profile's score, one at y=-7 and one at y=7, so the number
+				-- profile's score, one at y=-10 and one at y=10, so the number
 				-- appeared twice. One line, level with the points/rank columns.
 				if player ~= PLAYER_1 then self:visible(false) return end
 
@@ -174,10 +174,10 @@ for player in ivalues(PlayerNumber) do
 					self:visible(false)
 					return
 				end
-				self:y(7)
+				self:y(10)
 			else
 				self:visible(PROFILEMAN:IsPersistentProfile(player))
-				self:y(player == PLAYER_1 and -7 or 7)
+				self:y(player == PLAYER_1 and -10 or 10)
 			end
 
 			if params.Song ~= nil then
@@ -269,8 +269,8 @@ for player in ivalues(PlayerNumber) do
 end
 
 -- Global ITL points + global ITL rank, as a subtitle line reading (left to
--- right) "points, rank, ITG score": same vertical level (y=7) and font size
--- (zoom 0.2) as the ITG/EX score at the end of the line (see the BitmapText
+-- right) "points, rank, ITG score": same vertical level (y=10) and font size
+-- (zoom 0.4) as the ITG/EX score at the end of the line (see the BitmapText
 -- above, inside the per-player loop), positioned just to its left. Solo,
 -- persistent-profile player only. Points are color-coded by the song's LOCAL
 -- top-N standing (green = top75, yellow = top150, white otherwise); rank is
@@ -281,7 +281,7 @@ af[#af+1] = Def.BitmapText{
 	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 	Text="",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(7)
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(10)
 		self:x( ITL_COL_PTS )
 		self.hash = nil
 	end,
@@ -348,7 +348,7 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	Name="ITGScore",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(-7)
+		self:visible(false):horizalign(left):zoom(ITL_ZOOM):y(0)
 		self:x( ITL_COL_EX )
 		self:diffuse(Color.White)
 	end,
@@ -383,7 +383,7 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(7)
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(10)
 		self:x( ITL_COL_RANK )
 		self.hash = nil
 	end,
