@@ -60,3 +60,59 @@ HUD_PANEL_ALPHA = 0.90
 HUDPanel = function(actor)
 	return actor:diffuse(HUD_PANEL_COLOR):diffusealpha(HUD_PANEL_ALPHA)
 end
+
+-- Corner brackets marking out a panel as a HUD card: a two-armed L at the top
+-- left and another at the bottom right, the same device the mockup used.
+--
+-- Add the result as a SIBLING of the panel quad it decorates, passing the same
+-- local offset that quad uses, so the brackets inherit every transform the
+-- parent frame applies -- several of these frames animate on entry (the step
+-- artist box slides up 30px, panes bounce in), and absolute screen coordinates
+-- would drift away from the panel they belong to.
+--
+--   w, h    : the panel's size
+--   dx, dy  : the panel's local position, if it isn't at the frame origin
+--   corners : "both" (default), "tl" for the top-left bracket alone -- what
+--             panels whose bottom edge fades out want -- or "br" for panels that
+--             already carry a full-width rule along their top edge
+--
+-- TWEAK: HUD_CARD_ARM is how far the brackets reach along each edge, and
+-- HUD_CARD_ALPHA how strongly they read.
+HUD_CARD_ARM = 10
+HUD_CARD_THICKNESS = 2
+HUD_CARD_ALPHA = 0.65
+
+HUDCardDecor = function(w, h, dx, dy, corners)
+	dx, dy = dx or 0, dy or 0
+	local hw, hh = w/2, h/2
+	local arm, thick = HUD_CARD_ARM, HUD_CARD_THICKNESS
+
+	local af = Def.ActorFrame{
+		InitCommand=function(self) self:xy(dx, dy) end
+	}
+
+	-- One L, anchored at (cx,cy) growing inward by (sx,sy) which are each +/-1.
+	local function bracket(cx, cy, sx, sy)
+		af[#af+1] = Def.Quad{
+			InitCommand=function(self)
+				self:zoomto(arm, thick):xy(cx + sx*arm/2, cy + sy*thick/2)
+				self:diffuse(DimColor(PlayerColor(PLAYER_1), 1.0, HUD_CARD_ALPHA))
+			end
+		}
+		af[#af+1] = Def.Quad{
+			InitCommand=function(self)
+				self:zoomto(thick, arm):xy(cx + sx*thick/2, cy + sy*arm/2)
+				self:diffuse(DimColor(PlayerColor(PLAYER_1), 1.0, HUD_CARD_ALPHA))
+			end
+		}
+	end
+
+	if corners ~= "br" then
+		bracket(-hw, -hh,  1,  1)
+	end
+	if corners ~= "tl" then
+		bracket( hw,  hh, -1, -1)
+	end
+
+	return af
+end

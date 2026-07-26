@@ -456,9 +456,14 @@ for player in ivalues(PlayerNumber) do
 			self:zoomtowidth(_screen.w/2-10)
 			self:zoomtoheight(pane_height)
 			self:vertalign(top)
-			self:diffuse(color("#0E1519")):diffusealpha(0.88)
+			HUDPanel(self)
 		end
 	}
+
+	-- vertalign(top) above means the pane hangs below the frame origin, so the
+	-- bracket is offset by half its height to line up with it. Bottom-right only:
+	-- the DifficultyRule below already rules this card's whole top edge.
+	af2[#af2+1] = HUDCardDecor(_screen.w/2-10, pane_height, 0, pane_height/2, "br")
 
 	-- The difficulty color now reads as a rule along the card's top edge rather
 	-- than flooding the whole pane, so the stats printed on it stay legible.

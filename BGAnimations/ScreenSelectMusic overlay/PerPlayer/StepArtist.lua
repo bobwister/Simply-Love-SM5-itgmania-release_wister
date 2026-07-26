@@ -138,6 +138,11 @@ return Def.ActorFrame{
 		end
 	},
 
+	-- Top-left bracket only: this panel's bottom edge is faded out by a
+	-- fadebottom that varies with how many credit lines the chart has, so a
+	-- bottom-right bracket would hang in empty space.
+	HUDCardDecor(190, _screen.h/8, 120, 18, "tl"),
+
 	--STEPS label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=GAMESTATE:IsCourseMode() and Screen.String("SongNumber"):format(1) or Screen.String("STEPS"),

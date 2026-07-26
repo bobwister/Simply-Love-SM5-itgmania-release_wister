@@ -1,4 +1,25 @@
-local function gen_vertices(player, width, height, Steps, desaturation)
+-- "Technique HUD" density-graph palette.
+--
+-- Monochrome: a single hue across the whole graph. The stock graph ramped
+-- blue -> purple by measure height, but the contour's own shape already conveys
+-- density, so the hue ramp was redundant decoration. Alpha still falls off
+-- toward the baseline so the area reads as a fill beneath a bright top edge
+-- (the "liseret", drawn by NPS_Histogram_Stroke below) rather than a solid
+-- block of colour.
+--
+-- Opt-in: only callers passing hud=true get this. Gameplay's scrolling graph
+-- and the evaluation graphs keep the stock blue/purple until asked, since
+-- gen_vertices is shared by all of them.
+--
+-- TWEAK: HUD_FILL is the graph's colour; the two alphas are its vertical fade.
+local HUD_FILL       = color("#00C8DE")
+local HUD_ALPHA_TOP  = 0.72
+local HUD_ALPHA_BASE = 0.10
+-- thickness of the liseret, in the graph's own pixel units
+local HUD_STROKE_PX    = 1.5
+local HUD_STROKE_ALPHA = 0.95
+
+local function gen_vertices(player, width, height, Steps, desaturation, hud)
 	local Song
 	local first_step_has_occurred = false
 	local pn = ToEnumShortString(player)
@@ -44,6 +65,18 @@ local function gen_vertices(player, width, height, Steps, desaturation)
 		local blue   = {0,    0.678, 0.753, 1}
 		local purple = {0.51, 0,     0.631, 1}
 
+		-- HUD palette: one hue everywhere, fading out toward the baseline. Both
+		-- ends of the ramp get the same colour so the lerp below is a no-op and
+		-- the graph comes out monochrome. See the constants at the top.
+		-- Separate tables, not two references to one, so the Desaturate() calls
+		-- below cannot apply twice to the same values.
+		local base_alpha = 1
+		if hud then
+			blue   = {HUD_FILL[1], HUD_FILL[2], HUD_FILL[3], HUD_ALPHA_TOP}
+			purple = {HUD_FILL[1], HUD_FILL[2], HUD_FILL[3], HUD_ALPHA_TOP}
+			base_alpha = HUD_ALPHA_BASE
+		end
+
 		if desaturation ~= nil then
 			local function Desaturate(color, desaturation)
 				local luma = 0.3 * color[1] + 0.59 * color[2] + 0.11 * color[3]
@@ -55,6 +88,10 @@ local function gen_vertices(player, width, height, Steps, desaturation)
 			blue = Desaturate(blue, desaturation)
 			purple = Desaturate(purple, desaturation)
 		end
+
+		-- baseline colour: the low-density hue, faded out in HUD mode so the fill
+		-- reads as a gradient. Identical to `blue` in stock mode.
+		local lower = {blue[1], blue[2], blue[3], base_alpha}
 
 		local upper
 
@@ -88,8 +125,8 @@ local function gen_vertices(player, width, height, Steps, desaturation)
 					-- for example, lerp_color(0.5, yellow, orange) will return the color that is halfway between yellow and orange
 					upper = lerp_color(math.abs(y/height), blue, purple )
 
-					verts[#verts+1] = {{x, 0, 0}, blue} -- bottom of graph (blue)
-					verts[#verts+1] = {{x, y, 0}, upper}  -- top of graph (somewhere between blue and purple)
+					verts[#verts+1] = {{x, 0, 0}, lower} -- baseline
+					verts[#verts+1] = {{x, y, 0}, upper}  -- top of graph (somewhere between the two hues)
 				end
 			end
 		end
@@ -99,8 +136,8 @@ local function gen_vertices(player, width, height, Steps, desaturation)
 		-- all the other measures but end abruptly at the start of the
 		-- measure.
 		if NPSperMeasure[#NPSperMeasure] ~= 0 then
-			verts[#verts+1] = {{width, 0, 0}, blue}
-			verts[#verts+1] = {{width, 0, 0}, blue}
+			verts[#verts+1] = {{width, 0, 0}, lower}
+			verts[#verts+1] = {{width, 0, 0}, lower}
 		end
 	end
 
@@ -131,7 +168,7 @@ function interpolate_vert(v1, v2, offset)
     return {{offset, y, 0}, color}
 end
 
-function NPS_Histogram(player, width, height, desaturation)
+function NPS_Histogram(player, width, height, desaturation, hud)
 	local pn = ToEnumShortString(player)
 	local amv = Def.ActorMultiVertex{
 		InitCommand=function(self)
@@ -144,7 +181,54 @@ function NPS_Histogram(player, width, height, desaturation)
 			-- we've reached a new song, so reset the vertices for the density graph
 			-- this will occur at the start of each new song in CourseMode
 			-- and at the start of "normal" gameplay
-			local verts = gen_vertices(player, width, height, nil, desaturation)
+			local verts = gen_vertices(player, width, height, nil, desaturation, hud)
+			self:SetNumVertices(#verts):SetVertices(verts)
+		end
+	}
+
+	return amv
+end
+
+-- The bright top edge ("liseret") that traces the density graph's contour.
+--
+-- Drawn as its own thin QuadStrip rather than a DrawMode_LineStrip: line
+-- thickness there depends on the graphics driver's minimum line width, so a
+-- 1.5px request is not portable. Two vertices per contour point, offset
+-- downward into the fill, give an exact and consistent thickness.
+--
+-- Meant to be layered directly over NPS_Histogram with the same width/height
+-- and the same positioning, so the two stay registered.
+function NPS_Histogram_Stroke(player, width, height, desaturation)
+	local pn = ToEnumShortString(player)
+	local amv = Def.ActorMultiVertex{
+		InitCommand=function(self)
+			self:SetDrawState({Mode="DrawMode_QuadStrip"})
+		end,
+		["CurrentSteps"..pn.."ChangedMessageCommand"]=function(self)
+			self:queuecommand("Redraw")
+		end,
+		RedrawCommand=function(self)
+			-- Derive from the fill's own vertices so the two can never disagree
+			-- about the contour. gen_vertices emits [baseline, top, baseline, top,
+			-- ...], so the tops are the even indices.
+			local fill = gen_vertices(player, width, height, nil, desaturation, true)
+			local verts = {}
+
+			for i=2, #fill, 2 do
+				local x, y = fill[i][1][1], fill[i][1][2]
+				local c = fill[i][2]
+				-- same hue as the fill, at near-full strength so the contour reads
+				-- as a bright edge on top of it
+				local edge = {c[1], c[2], c[3], HUD_STROKE_ALPHA}
+				-- y is negative upward, so +thickness moves down into the fill.
+				-- Clamped at the baseline: measures with no notes sit at y=0, and
+				-- without this the edge would poke below the graph there (and at
+				-- the closing vertex) instead of vanishing into it.
+				local y2 = math.min(y + HUD_STROKE_PX, 0)
+				verts[#verts+1] = {{x, y, 0}, edge}
+				verts[#verts+1] = {{x, y2, 0}, edge}
+			end
+
 			self:SetNumVertices(#verts):SetVertices(verts)
 		end
 	}

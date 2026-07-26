@@ -108,6 +108,8 @@ af[#af+1] = Def.Quad{
 	end
 }
 
+af[#af+1] = HUDCardDecor(width, height)
+
 af[#af+1] = Def.ActorFrame{
 	Name="ChartParser",
 	-- Hide when scrolling through the wheel. This also handles the case of
@@ -144,7 +146,9 @@ af[#af+1] = Def.ActorFrame{
 local af2 = af[#af]
 
 -- The Density Graph itself. It already has a "RedrawCommand".
-af2[#af2+1] = NPS_Histogram(player, width, height)..{
+-- The trailing `true` selects the monochrome Technique HUD palette (one hue,
+-- fading toward the baseline); see Scripts/SL-Histogram.lua.
+af2[#af2+1] = NPS_Histogram(player, width, height, nil, true)..{
 	Name="DensityGraph",
 	OnCommand=function(self)
 		self:addx(-width/2):addy(height/2)
@@ -161,6 +165,26 @@ af2[#af2+1] = NPS_Histogram(player, width, height)..{
 }
 -- Don't let the density graph parse the chart.
 -- We do this in parent actorframe because we want to "stall" before we parse.
+af2[#af2]["CurrentSteps"..pn.."ChangedMessageCommand"] = nil
+
+-- The bright edge tracing the graph's contour. Same width/height and the same
+-- positioning as the fill above so the two stay registered, and it mirrors the
+-- fill's visibility so Pattern Info hides both together.
+af2[#af2+1] = NPS_Histogram_Stroke(player, width, height)..{
+	Name="DensityGraphStroke",
+	OnCommand=function(self)
+		self:addx(-width/2):addy(height/2)
+	end,
+	HideCommand=function(self)
+		self:visible(false)
+	end,
+	RedrawCommand=function(self)
+		self:visible(not showPatternInfo)
+	end,
+	TogglePatternInfoCommand=function(self)
+		self:visible(not showPatternInfo)
+	end
+}
 af2[#af2]["CurrentSteps"..pn.."ChangedMessageCommand"] = nil
 
 -- The Peak NPS text
@@ -349,7 +373,10 @@ af2[#af2+1] = Def.ActorFrame{
 	end,
 	
 	-- Background for the additional chart info.
-	-- Only shown in 1 Player mode
+	-- Only shown in 1 Player mode.
+	-- No card brackets of its own: this sits inside the density panel's footprint
+	-- (same width, 10px shorter), so that panel's brackets already frame it and a
+	-- second set 9px away would just read as a doubled edge.
 	Def.Quad{
 		InitCommand=function(self)
 			HUDPanel(self):addy(-4):zoomto(width, height-10)

@@ -27,6 +27,8 @@ af[#af+1] = Def.Quad{
 	end
 }
 
+af[#af+1] = HUDCardDecor(_w, 50)
+
 -- ActorFrame for Artist, BPM, and Song length
 af[#af+1] = Def.ActorFrame{
 	InitCommand=function(self) self:xy(-100,-6) end,

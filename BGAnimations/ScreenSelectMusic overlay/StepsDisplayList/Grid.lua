@@ -53,6 +53,8 @@ t[#t+1] = Def.Quad{
 	end
 }
 
+t[#t+1] = HUDCardDecor(32, 152)
+
 local Grid = Def.ActorFrame{
 	Name="Grid",
 	InitCommand=function(self) end,
