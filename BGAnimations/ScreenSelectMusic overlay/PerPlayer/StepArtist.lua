@@ -116,8 +116,10 @@ return Def.ActorFrame{
 				self:zoomto(175, _screen.h/28):x(113):y(0)
 			end
 			if StepsOrTrail then
+				-- Technique HUD: keep the difficulty hue as the signal, but dark
+				-- enough to be a card rather than a colored slab.
 				local difficulty = StepsOrTrail:GetDifficulty()
-				self:diffuse( DifficultyColor(difficulty) )
+				self:diffuse( DimColor(DifficultyColor(difficulty), 0.24, 0.90) )
 				text_table = GetStepsCredit(player)
 				if #GAMESTATE:GetHumanPlayers() == 1 then 
 					if #text_table == 3 then
@@ -131,16 +133,16 @@ return Def.ActorFrame{
 					self:fadebottom(0)
 				end
 			else
-				self:diffuse( PlayerColor(player) )
+				self:diffuse( DimColor(PlayerColor(player), 0.24, 0.90) )
 			end
 		end
-	},	
+	},
 
 	--STEPS label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=GAMESTATE:IsCourseMode() and Screen.String("SongNumber"):format(1) or Screen.String("STEPS"),
 		InitCommand=function(self)
-			self:diffuse(0,0,0,1):horizalign(left):x(40):maxwidth(40):zoom(0.8)
+			self:diffuse(color("#7C939E")):horizalign(left):x(40):maxwidth(40):zoom(0.8)
 		end,
 		UpdateTrailTextMessageCommand=function(self, params)
 			self:settext( THEME:GetString("ScreenSelectCourse", "SongNumber"):format(params.index) )
@@ -150,11 +152,11 @@ return Def.ActorFrame{
 	--stepartist text
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		InitCommand=function(self)
-			self:diffuse(color("#1e282f")):horizalign(left):zoom(0.8)
+			self:diffuse(color("#E8F1F4")):horizalign(left):zoom(0.8)
 			if GAMESTATE:IsCourseMode() then
 				self:x(70):maxwidth(138)
 			else
-				self:x(80):diffuse(color("#000000"))
+				self:x(80):diffuse(color("#E8F1F4"))
 				if #GAMESTATE:GetHumanPlayers() == 1 then 
 					self:maxwidth(175)
 				else
@@ -180,7 +182,7 @@ return Def.ActorFrame{
 				-- to ensure it stays synced with the scrolling list of songs
 				if not GAMESTATE:IsCourseMode() then
 					-- only queue a Marquee if there are things in the text_table to display
-					self:x(80):diffuse(color("#000000"))
+					self:x(80):diffuse(color("#E8F1F4"))
 					if #GAMESTATE:GetHumanPlayers() == 1 then 
 						self:maxwidth(175)
 					else

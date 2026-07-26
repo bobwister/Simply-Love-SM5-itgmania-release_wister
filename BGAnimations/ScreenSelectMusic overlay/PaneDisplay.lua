@@ -10,6 +10,12 @@ local pane_height = 60
 
 local text_zoom = WideScale(0.8, 0.9)
 
+-- "Technique HUD": the pane is a dark card now rather than a difficulty-colored
+-- slab, so its text is light. Kept as constants because this file sets the
+-- color in ~20 places, including from the GrooveStats response processor.
+local PANE_TEXT = color("#E8F1F4")
+local PANE_TEXT_HEX = "#E8F1F4"
+
 -- -----------------------------------------------------------------------
 -- Convenience function to return the SongOrCourse and StepsOrTrail for a
 -- for a player.
@@ -118,7 +124,7 @@ local GetScoresRequestProcessor = function(res, params)
 							string.format("%.2f%%", gsEntry["score"]/100),
 							machineName,
 							machineScore,
-							"#000000"
+							PANE_TEXT_HEX
 						)
 						worldRecordSet = true
 					end
@@ -132,7 +138,7 @@ local GetScoresRequestProcessor = function(res, params)
 								string.format("%.2f%%", gsEntry["score"]/100),
 								playerName,
 								playerScore,
-								"#000000"
+								PANE_TEXT_HEX
 							)
 							personalRecordSet = true
 						else
@@ -150,7 +156,7 @@ local GetScoresRequestProcessor = function(res, params)
 									string.format("%.2f%%", gsScore),
 									playerName,
 									playerScore,
-									"#000000"
+									PANE_TEXT_HEX
 								)
 								personalRecordSet = true
 							end
@@ -165,7 +171,7 @@ local GetScoresRequestProcessor = function(res, params)
 							string.format("%.2f%%", gsEntry["score"]/100),
 							rivalName,
 							rivalScore,
-							"#000000"
+							PANE_TEXT_HEX
 						)
 						rivalNum = rivalNum + 1
 					end
@@ -361,7 +367,7 @@ af[#af+1] = RequestResponseActor(17, 50)..{
 					requestCacheKey = requestCacheKey .. SL[pn].Streams.Hash .. SL[pn].ApiKey .. pn
 					local loadingText = master:GetChild("PaneDisplayP"..i):GetChild("Loading")
 					loadingText:visible(true)
-					loadingText:settext("Loading ..."):diffuse(Color.Black)
+					loadingText:settext("Loading ..."):diffuse(PANE_TEXT)
 					sendRequest = true
 				end
 			end
@@ -412,8 +418,8 @@ for player in ivalues(PlayerNumber) do
 
 	af2.PlayerJoinedMessageCommand=function(self, params)
 		if player==params.Player then
-			-- ensure BackgroundQuad is colored before it is made visible
-			self:GetChild("BackgroundQuad"):playcommand("Set")
+			-- ensure the difficulty rule is colored before the pane is made visible
+			self:GetChild("DifficultyRule"):playcommand("Set")
 			self:visible(true)
 				:zoom(0):croptop(0):bounceend(0.3):zoom(1)
 				:playcommand("Update")
@@ -450,13 +456,22 @@ for player in ivalues(PlayerNumber) do
 			self:zoomtowidth(_screen.w/2-10)
 			self:zoomtoheight(pane_height)
 			self:vertalign(top)
+			self:diffuse(color("#0E1519")):diffusealpha(0.88)
+		end
+	}
+
+	-- The difficulty color now reads as a rule along the card's top edge rather
+	-- than flooding the whole pane, so the stats printed on it stay legible.
+	af2[#af2+1] = Def.Quad{
+		Name="DifficultyRule",
+		InitCommand=function(self)
+			self:zoomtowidth(_screen.w/2-10):zoomtoheight(2):vertalign(top)
 		end,
 		SetCommand=function(self)
 			local SongOrCourse, StepsOrTrail = GetSongAndSteps(player)
 			if GAMESTATE:IsHumanPlayer(player) then
 				if StepsOrTrail then
-					local difficulty = StepsOrTrail:GetDifficulty()
-					self:diffuse( DifficultyColor(difficulty) )
+					self:diffuse( DifficultyColor(StepsOrTrail:GetDifficulty()) )
 				else
 					self:diffuse( PlayerColor(player) )
 				end
@@ -480,7 +495,7 @@ for player in ivalues(PlayerNumber) do
 			-- numerical value
 			LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				InitCommand=function(self)
-					self:zoom(text_zoom):diffuse(Color.Black):horizalign(right)
+					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
 					self:x(pos.col[col])
 					self:y(pos.row[row])
 				end,
@@ -502,7 +517,7 @@ for player in ivalues(PlayerNumber) do
 			LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				Text=item.name,
 				InitCommand=function(self)
-					self:zoom(text_zoom):diffuse(Color.Black):horizalign(left)
+					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(left)
 					self:x(pos.col[col]+3)
 					self:y(pos.row[row])
 				end
@@ -514,7 +529,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="MachineHighScoreName",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(Color.Black):maxwidth(30)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
 			self:x(pos.col[3]-50*text_zoom)
 			self:y(pos.row[1])
 		end,
@@ -522,7 +537,7 @@ for player in ivalues(PlayerNumber) do
 			-- We overload this actor to work both for GrooveStats and also offline.
 			-- If we're connected, we let the ResponseProcessor set the text
 			if IsServiceAllowed(SL.GrooveStats.GetScores) and ThemePrefs.Get("MusicWheelGS") == "Pane" then
-				self:settext("----"):diffuse(Color.Black)
+				self:settext("----"):diffuse(PANE_TEXT)
 			else
 				self:queuecommand("SetDefault")
 			end
@@ -530,7 +545,7 @@ for player in ivalues(PlayerNumber) do
 		SetDefaultCommand=function(self)
 			local SongOrCourse, StepsOrTrail = GetSongAndSteps(player)
 			local machineScore = GetScoreFromProfile(machine_profile, SongOrCourse, StepsOrTrail)
-			self:settext(machineScore and machineScore:GetName() or "----"):diffuse(Color.Black)
+			self:settext(machineScore and machineScore:GetName() or "----"):diffuse(PANE_TEXT)
 			DiffuseEmojis(self:ClearAttributes())
 		end
 	}
@@ -539,7 +554,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="MachineHighScore",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(Color.Black):horizalign(right)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
 			self:x(pos.col[3]+25*text_zoom)
 			self:y(pos.row[1])
 		end,
@@ -547,7 +562,7 @@ for player in ivalues(PlayerNumber) do
 			-- We overload this actor to work both for GrooveStats and also offline.
 			-- If we're connected, we let the ResponseProcessor set the text
 			if IsServiceAllowed(SL.GrooveStats.GetScores) and ThemePrefs.Get("MusicWheelGS") == "Pane" then
-				self:settext("??.??%"):diffuse(Color.Black)
+				self:settext("??.??%"):diffuse(PANE_TEXT)
 			else
 				self:queuecommand("SetDefault")
 			end
@@ -556,9 +571,9 @@ for player in ivalues(PlayerNumber) do
 			local SongOrCourse, StepsOrTrail = GetSongAndSteps(player)
 			local machineScore = GetScoreFromProfile(machine_profile, SongOrCourse, StepsOrTrail)
 			if machineScore ~= nil then
-				self:settext(FormatPercentScore(machineScore:GetPercentDP())):diffuse(Color.Black)
+				self:settext(FormatPercentScore(machineScore:GetPercentDP())):diffuse(PANE_TEXT)
 			else
-				self:settext("??.??%"):diffuse(Color.Black)
+				self:settext("??.??%"):diffuse(PANE_TEXT)
 			end
 		end
 	}
@@ -567,7 +582,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="PlayerHighScoreName",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(Color.Black):maxwidth(30)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
 			self:x(pos.col[3]-50*text_zoom)
 			self:y(pos.row[2])
 		end,
@@ -582,7 +597,7 @@ for player in ivalues(PlayerNumber) do
 		end,
 		SetDefaultCommand=function(self)
 			local playerScore = GetScoreForPlayer(player)
-			self:settext(playerScore and playerScore:GetName() or "----"):diffuse(Color.Black)
+			self:settext(playerScore and playerScore:GetName() or "----"):diffuse(PANE_TEXT)
 			DiffuseEmojis(self:ClearAttributes())
 		end
 	}
@@ -591,7 +606,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="PlayerHighScore",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(Color.Black):horizalign(right)
+			self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
 			self:x(pos.col[3]+25*text_zoom)
 			self:y(pos.row[2])
 		end,
@@ -607,9 +622,9 @@ for player in ivalues(PlayerNumber) do
 		SetDefaultCommand=function(self)
 			local playerScore = GetScoreForPlayer(player)
 			if playerScore ~= nil then
-				self:settext(FormatPercentScore(playerScore:GetPercentDP())):diffuse(Color.Black)
+				self:settext(FormatPercentScore(playerScore:GetPercentDP())):diffuse(PANE_TEXT)
 			else
-				self:settext("??.??%"):diffuse(Color.Black)
+				self:settext("??.??%"):diffuse(PANE_TEXT)
 			end
 		end
 	}
@@ -618,7 +633,7 @@ for player in ivalues(PlayerNumber) do
 		Name="Loading",
 		Text="Loading ... ",
 		InitCommand=function(self)
-			self:zoom(text_zoom):diffuse(Color.Black)
+			self:zoom(text_zoom):diffuse(PANE_TEXT)
 			self:x(pos.col[3]-15)
 			self:y(pos.row[3])
 			self:visible(false)
@@ -633,7 +648,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = LoadFont("Wendy/_wendy small")..{
 		Name="DifficultyMeter",
 		InitCommand=function(self)
-			self:horizalign(right):diffuse(Color.Black)
+			self:horizalign(right):diffuse(PANE_TEXT)
 			self:xy(pos.col[4], pos.row[2])
 			if not IsUsingWideScreen() then self:maxwidth(66) end
 			self:queuecommand("Set")
@@ -660,7 +675,7 @@ for player in ivalues(PlayerNumber) do
 			af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				Name="Rival"..i.."Name",
 				InitCommand=function(self)
-					self:zoom(text_zoom):diffuse(Color.Black):maxwidth(30)
+					self:zoom(text_zoom):diffuse(PANE_TEXT):maxwidth(30)
 					self:x(pos.col[3]+50*text_zoom)
 					self:y(pos.row[i])
 				end,
@@ -668,7 +683,7 @@ for player in ivalues(PlayerNumber) do
 					self:visible(IsServiceAllowed(SL.GrooveStats.GetScores))
 				end,
 				SetCommand=function(self)
-					self:settext("----"):diffuse(Color.Black)
+					self:settext("----"):diffuse(PANE_TEXT)
 				end
 			}
 	
@@ -676,7 +691,7 @@ for player in ivalues(PlayerNumber) do
 			af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 				Name="Rival"..i.."Score",
 				InitCommand=function(self)
-					self:zoom(text_zoom):diffuse(Color.Black):horizalign(right)
+					self:zoom(text_zoom):diffuse(PANE_TEXT):horizalign(right)
 					self:x(pos.col[3]+125*text_zoom)
 					self:y(pos.row[i])
 				end,
@@ -684,7 +699,7 @@ for player in ivalues(PlayerNumber) do
 					self:visible(IsServiceAllowed(SL.GrooveStats.GetScores))
 				end,
 				SetCommand=function(self)
-					self:settext("??.??%"):diffuse(Color.Black)
+					self:settext("??.??%"):diffuse(PANE_TEXT)
 				end
 			}
 		end

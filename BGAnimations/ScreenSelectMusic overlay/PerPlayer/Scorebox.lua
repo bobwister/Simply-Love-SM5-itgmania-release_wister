@@ -17,9 +17,19 @@ local IsNotWide = (GetScreenAspectRatio() < 16/9)
 local NoteFieldIsCentered = (GetNotefieldX(player) == _screen.cx)
 local NumEntries = 5
 
-local border = 5
+-- Technique HUD: a hairline rule rather than a thick frame. The border quad is
+-- drawn behind the body, so this is the amount it peeks out on each side, and
+-- it stays the per-source tint (GrooveStats blue / RPG yellow / ITL pink) that
+-- tells you which leaderboard is currently on screen.
+local border = 2
 local width = 162
 local height = 80
+
+-- Smoked glass rather than flat black, matching the wheel rows and the
+-- left-column cards. Used both when the body is built and when it is faded back
+-- in after a leaderboard request, which would otherwise restore it to opaque.
+local body_color = color("#0B1116")
+local body_alpha = 0.94
 
 local cur_style = 0
 local num_styles = 4
@@ -460,7 +470,7 @@ local af = Def.ActorFrame{
 		self:GetChild("SRPG8Logo"):visible(true)
 		self:GetChild("ITLLogo"):visible(true)
 		self:GetChild("Outline"):visible(true)
-		self:GetChild("Background"):linear(transition_seconds/2):diffusealpha(1):visible(true)
+		self:GetChild("Background"):linear(transition_seconds/2):diffusealpha(body_alpha):visible(true)
 		
 		local start = cur_style
 
@@ -606,7 +616,7 @@ local af = Def.ActorFrame{
 	Def.Quad{
 		Name="Background",
 		InitCommand=function(self)
-			self:diffuse(color("#000000")):setsize(width, height)
+			self:diffuse(body_color):diffusealpha(body_alpha):setsize(width, height)
 			if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
 				self:setsize(width - 40, height)
 			end

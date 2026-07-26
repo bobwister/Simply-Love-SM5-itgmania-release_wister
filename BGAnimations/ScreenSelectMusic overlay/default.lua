@@ -72,6 +72,10 @@ local af = Def.ActorFrame{
 	-- Banner Art
 	LoadActor("./Banner.lua"),
 
+	-- Footer content: session/in-song clocks (moved down out of the header) and
+	-- the GrooveStats connection light.
+	LoadActor("./Footer.lua"),
+
 	-- ---------------------------------------------------
 	-- finally, load the overlay used for sorting the MusicWheel (and more), hidden by default
 	LoadActor("./SortMenu/default.lua"),

@@ -13,6 +13,18 @@ local stepstype = GAMESTATE:GetCurrentStyle():GetStepsType()
 
 local IsNotWide = (GetScreenAspectRatio() < 16/9)
 
+-- Right-aligned data columns at the end of each row, reading left to right:
+-- points, global ITL rank, EX score. TWEAK: these three numbers are the only
+-- thing controlling the horizontal spacing of that group; all are offsets from
+-- the row's right edge, so lowering a value moves that column right.
+local ITL_ANCHOR = _screen.w/(WideScale(2.15, 2.14))
+local ITL_COL_PTS  = ITL_ANCHOR - 132
+local ITL_COL_RANK = ITL_ANCHOR - 74
+local ITL_COL_EX   = ITL_ANCHOR - 16
+-- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
+-- treatment already used on the evaluation screen.
+local ITL_LABEL_COLOR = color("#5A6166")
+
 if ThemePrefs.Get("SongSelectBG") ~= "Off" then
 	af[#af+1] = Def.Sprite{
 		InitCommand=function(self)
@@ -80,15 +92,15 @@ for player in ivalues(PlayerNumber) do
 	af[#af+1] = LoadActor("GetLamp.lua", player)
 	af[#af+1] = LoadActor("Favorites.lua", player)
 
-	-- Add ITL EX scores to the song wheel as well.
-	-- It will be centered to the item if only one player is enabled, and stacked otherwise.
+	-- EX score column at the end of the row. Solo draws one line level with the
+	-- points/rank columns; versus stacks P1 above P2.
 	af[#af+1] = Def.BitmapText{
 		Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 		Text="",
 		InitCommand=function(self)
-			self:visible(false)
+			self:visible(false):horizalign(right)
 			self:zoom(0.2)
-			self:x( _screen.w/(WideScale(2.15, 2.14)) - self:GetWidth()*self:GetZoom() - 40 )
+			self:x( ITL_COL_EX )
 			self:diffuse(SL.JudgmentColors["FA+"][player == "PlayerNumber_P1" and 1 or 2])
 		end,
 		-- Both players actors are always visible now
@@ -100,27 +112,29 @@ for player in ivalues(PlayerNumber) do
 		-- end,
 		SetCommand=function(self, params)
 			-- Only display EX score if a profile is found for an enabled player.
-			-- in 1 player mode, it will show the details for the opposite player
-			local otherplayer = player == PLAYER_1 and PLAYER_2 or PLAYER_1
 			local pn = ToEnumShortString(player)
 
 			if GAMESTATE:GetNumSidesJoined() == 1 then
-				if PROFILEMAN:IsPersistentProfile(player) or PROFILEMAN:IsPersistentProfile(otherplayer) then
-					self:visible(true)
-					if PROFILEMAN:IsPersistentProfile(otherplayer) then 
-						pn = pn == "P1" and "P2" or "P1"
-					end
+				-- Solo: only the P1 actor draws, reading from whichever side
+				-- actually holds the profile. Both actors used to render the same
+				-- profile's score, one at y=-7 and one at y=7, so the number
+				-- appeared twice. One line, level with the points/rank columns.
+				if player ~= PLAYER_1 then self:visible(false) return end
+
+				if PROFILEMAN:IsPersistentProfile(PLAYER_1) then
+					pn = "P1"
+				elseif PROFILEMAN:IsPersistentProfile(PLAYER_2) then
+					pn = "P2"
+				else
+					self:visible(false)
+					return
 				end
+				self:y(7)
 			else
 				self:visible(PROFILEMAN:IsPersistentProfile(player))
+				self:y(player == PLAYER_1 and -7 or 7)
 			end
 
-			if player == PLAYER_1 then
-				self:y(-7)
-			else
-				self:y(7)
-			end
-			
 			if params.Song ~= nil then
 				local song = params.Song
 				local song_dir = song:GetSongDir()
@@ -128,10 +142,11 @@ for player in ivalues(PlayerNumber) do
 					if SL[pn].ITLData["pathMap"][song_dir] ~= nil then
 						local hash = SL[pn].ITLData["pathMap"][song_dir]
 						if SL[pn].ITLData["hashMap"][hash] ~= nil then
-							self:settext(tostring(("%.2f"):format(SL[pn].ITLData["hashMap"][hash]["ex"] / 100)))
-							 if (GAMESTATE:GetNumSidesJoined() == 1 and PROFILEMAN:IsPersistentProfile(player)) then 
-							 	self:settext(SL[pn].ITLData["hashMap"][hash]["points"])
-							 end
+							-- Always the EX score here; points now live in the dedicated,
+							-- rank-tier-colored points/rank subtitle line below.
+							local ex = ("%.2f"):format(SL[pn].ITLData["hashMap"][hash]["ex"] / 100)
+							self:settext(ex .. " EX")
+							self:AddAttribute(#ex, { Length=3, Diffuse=ITL_LABEL_COLOR })
 							self:visible(true)
 							return
 						end
@@ -222,8 +237,7 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	InitCommand=function(self)
 		self:visible(false):horizalign(right):zoom(0.2):y(7)
-		-- TWEAK: horizontal position, just to the left of the rank text
-		self:x( _screen.w/(WideScale(2.15, 2.14)) - 90 )
+		self:x( ITL_COL_PTS )
 		self.hash = nil
 	end,
 	SetCommand=function(self, params)
@@ -268,7 +282,10 @@ af[#af+1] = Def.BitmapText{
 		else
 			self:diffuse(Color.White)
 		end
-		self:settext( ("%dpts"):format(points) ):visible(true)
+		local val = tostring(points)
+		self:settext( val .. " PTS" )
+		self:AddAttribute(#val, { Length=4, Diffuse=ITL_LABEL_COLOR })
+		self:visible(true)
 	end,
 	-- A fetch can raise our EX (and so our points) for this chart; re-read.
 	ITLRankResolvedMessageCommand=function(self, params)
@@ -284,8 +301,7 @@ af[#af+1] = Def.BitmapText{
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
 		self:visible(false):horizalign(right):zoom(0.2):y(7)
-		-- TWEAK: horizontal position, just to the left of the ITG/EX score
-		self:x( _screen.w/(WideScale(2.15, 2.14)) - 60 )
+		self:x( ITL_COL_RANK )
 		self.hash = nil
 	end,
 	SetCommand=function(self, params)
@@ -304,7 +320,7 @@ af[#af+1] = Def.BitmapText{
 
 		local rank = ITLRankGet(hash)
 		if type(rank) == "number" then
-			self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+			self:playcommand("ShowRank", { rank=rank })
 		elseif rank == false then
 			self:visible(false)
 		else
@@ -316,11 +332,17 @@ af[#af+1] = Def.BitmapText{
 			end
 		end
 	end,
+	ShowRankCommand=function(self, params)
+		local val = ITLRankOrdinal(params.rank)
+		self:settext( val .. " ITL" ):diffuse(ITLRankColor(params.rank))
+		self:AddAttribute(#val, { Length=4, Diffuse=ITL_LABEL_COLOR })
+		self:visible(true)
+	end,
 	ITLRankResolvedMessageCommand=function(self, params)
 		if self.hash and params.hash == self.hash then
 			local rank = ITLRankGet(self.hash)
 			if type(rank) == "number" then
-				self:settext(ITLRankOrdinal(rank)):diffuse(ITLRankColor(rank)):visible(true)
+				self:playcommand("ShowRank", { rank=rank })
 			else
 				self:visible(false)
 			end

@@ -4,26 +4,22 @@ local num_items = THEME:GetMetric("MusicWheel", "NumWheelItems")
 local num_visible_items = num_items - 2
 
 local item_width = _screen.w / 2.125
+local item_height = _screen.h / num_visible_items
+
+-- "Technique HUD": a group header is the same parallelogram plate as a song row
+-- (Scripts/SL-Helpers-WheelPlate.lua) but lit far more strongly on its leading
+-- edge, so packs read as separators rather than as just another song.
+local accent = PlayerColor(PLAYER_1)
+local lit  = DimColor(accent, 1.00, 0.34)
+local fade = DimColor(accent, 0.45, 0.06)
+local edge = DimColor(accent, 1.00, 0.70)
 
 local af = Def.ActorFrame{
 	-- the MusicWheel is centered via metrics under [ScreenSelectMusic]; offset by a slight amount to the right here
 	InitCommand=function(self) self:x(WideScale(28,33)) end,
-	Def.Quad{
-		InitCommand=function(self) 
-			self:horizalign(left):diffuse(Color.Black):zoomto(item_width, _screen.h/num_visible_items)
-			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				self:diffusealpha(1.0)
-			end
-		end
-	},
-	Def.Quad{
-		InitCommand=function(self) 
-			self:horizalign(left):diffuse(Color.White):zoomto(item_width, _screen.h/num_visible_items - 1)
-			if ThemePrefs.Get("VisualStyle") == "Technique" then
-				self:diffusealpha(0.25)
-			end
-		end
-	}
+
+	WheelPlate(item_width, item_height, edge, edge),
+	WheelPlate(item_width, item_height, lit, fade, 1),
 }
 
 if ThemePrefs.Get("SongSelectBG") ~= "Off" then

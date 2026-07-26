@@ -4,6 +4,8 @@ local pn = ToEnumShortString(player)
 
 local IsUltraWide = (GetScreenAspectRatio() > 21/9)
 
+local item_height = _screen.h / (THEME:GetMetric("MusicWheel", "NumWheelItems") - 2)
+
 local AwardMap = {
 	["StageAward_FullComboW1"] = 1,
 	["StageAward_FullComboW2"] = 2,
@@ -153,7 +155,14 @@ return Def.ActorFrame{
 				return
 			end
 
-			self:scaletoclipped(SL_WideScale(5, 6), 31)
+			-- Technique HUD: in solo the lamp is a full-height bar down the row's
+			-- leading edge, so clear state reads at a glance. In versus it stays
+			-- the small marker so both players' lamps still fit side by side.
+			if GAMESTATE:GetNumSidesJoined() == 1 then
+				self:zoomto(SL_WideScale(5, 6), item_height - 2)
+			else
+				self:zoomto(SL_WideScale(5, 6), 31)
+			end
 			self:horizalign(right)
 
 			-- Check ITL File

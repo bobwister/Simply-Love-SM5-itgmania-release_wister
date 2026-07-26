@@ -4,16 +4,22 @@ local num_items = THEME:GetMetric("MusicWheel", "NumWheelItems")
 local num_visible_items = num_items - 2
 
 local item_width = _screen.w / 2.125
+local item_height = _screen.h / num_visible_items
 
-local af =  Def.ActorFrame{
+-- "Technique HUD" restyle: rows are smoked-glass parallelograms, with the
+-- player's Simply Love color surviving only as a tint on the leading edge
+-- rather than flooding the whole row. See Scripts/SL-Helpers-WheelPlate.lua.
+local accent = PlayerColor(PLAYER_1)
+local tint = DimColor(accent, 0.30, 0.90) -- darkened so titles stay legible
+local ink  = { 0.045, 0.070, 0.085, 0.84 }
+local edge = DimColor(accent, 0.55, 0.50)
+
+local af = Def.ActorFrame{
 	-- the MusicWheel is centered via metrics under [ScreenSelectMusic]; offset by a slight amount to the right here
 	InitCommand=function(self) self:x(WideScale(28,33)) end,
 
-	Def.Quad{ InitCommand=function(self) self:horizalign(left):diffuse(0, 10/255, 17/255, 0.5):zoomto(item_width, _screen.h/num_visible_items) end },
-	Def.Quad{ InitCommand=function(self)
-		self:horizalign(left):diffuse(DarkUI() and {1,1,1,0.5} or PlayerColor(PLAYER_1)):zoomto(item_width, (_screen.h/num_visible_items)-1)
-		if ThemePrefs.Get("VisualStyle") == "SRPG8" or ThemePrefs.Get("VisualStyle") == "Technique" then self:diffusealpha(0.5) end
-	end }
+	WheelPlate(item_width, item_height, edge, edge),
+	WheelPlate(item_width, item_height, tint, ink, 1),
 }
 
 

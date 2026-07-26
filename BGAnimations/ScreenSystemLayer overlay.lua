@@ -31,6 +31,14 @@ local function CreditsText( player )
 			local textColor = Color.White
 			local shadowLength = 0
 
+			-- This theme targets solo play, so the P2 slot only ever renders the
+			-- "PRESS START" join prompt. Suppress it outright rather than showing
+			-- an invitation that will never be taken up.
+			if player == PLAYER_2 and not GAMESTATE:IsHumanPlayer(PLAYER_2) then
+				self:visible(false)
+				return
+			end
+
 			if screen then
 				bShow = THEME:GetMetric( screen:GetName(), "ShowCreditDisplay" )
 
@@ -142,7 +150,10 @@ t[#t+1] = Def.BitmapText{
 			end
 
 			if PREFSMAN:GetPreference("EventMode") then
-				self:settext( THEME:GetString("ScreenSystemLayer", "EventMode") )
+				-- This theme assumes Event Mode, so a permanent "EVENT MODE"
+				-- banner states the obvious and costs footer space that the
+				-- session clocks now use (ScreenSelectMusic overlay/Footer.lua).
+				self:visible(false)
 
 			elseif GAMESTATE:GetCoinMode() == "CoinMode_Pay" then
 				local credits = GetCredits()
@@ -199,7 +210,10 @@ t[#t+1] = Def.BitmapText{
 			end
 
 			if PREFSMAN:GetPreference("EventMode") then
-				self:settext( THEME:GetString("ScreenSystemLayer", "EventMode") )
+				-- This theme assumes Event Mode, so a permanent "EVENT MODE"
+				-- banner states the obvious and costs footer space that the
+				-- session clocks now use (ScreenSelectMusic overlay/Footer.lua).
+				self:visible(false)
 
 			elseif GAMESTATE:GetCoinMode() == "CoinMode_Pay" then
 				local credits = GetCredits()

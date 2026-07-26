@@ -25,12 +25,16 @@ return Def.Quad{
 			self:diffuse(GetCurrentColor(true))
 		end
 		if ThemePrefs.Get("VisualStyle") == "Technique" then
-			if topscreen == "ScreenSelectMusic" and not ThemePrefs.Get("RainbowMode") then
-				self:diffuse(0, 0, 0, 0.5)
-			else
-				self:diffusealpha(0)
-			end
+			self:diffusealpha(0)
 		end
+
+		-- ScreenSelectMusic draws its own footer band, inside the overlay, in
+		-- BGAnimations/ScreenSelectMusic overlay/Footer.lua. It has to: the
+		-- engine sorts a screen's children by draw order once, during Init, so a
+		-- draw order set from a metrics OnCommand never re-sorts and this quad
+		-- would keep covering the overlay content that belongs on top of it.
+		-- Band and content are siblings there, so they stack predictably.
+		self:visible(topscreen ~= "ScreenSelectMusic")
 	end,
 	ColorSelectedMessageCommand=function(self)
 		if ThemePrefs.Get("VisualStyle") == "SRPG8" then
