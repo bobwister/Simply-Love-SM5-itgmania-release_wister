@@ -74,13 +74,6 @@ end
 Branch.AfterScreenSelectColor = function()
 	local preferred_style = ThemePrefs.Get("AutoStyle")
 
-	-- "Allow Select game mode" = No: force Single instead of showing ScreenSelectStyle,
-	-- the same way AutoStyle already forces a specific style. Only kicks in when AutoStyle
-	-- itself isn't already dictating a style.
-	if preferred_style == "none" and not ThemePrefs.Get("AllowScreenSelectStyle") then
-		preferred_style = "single"
-	end
-
 	if preferred_style ~= "none"
 	-- AutoStyle should not be possible in pay mode
 	-- it's too confusing for machine operators, novice players, and developers alike
