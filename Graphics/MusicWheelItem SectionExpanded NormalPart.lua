@@ -39,6 +39,10 @@ if ThemePrefs.Get("SongSelectBG") ~= "Off" then
 	}
 end
 
+-- Same clear-progress figure the collapsed row carries, so opening a pack doesn't make
+-- its header lose the number it was showing a moment earlier.
+af[#af+1] = LoadActor("./MusicWheelItem GroupProgress.lua")
+
 return af
 
 

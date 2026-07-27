@@ -1,3 +1,9 @@
+-- The group rows' clear-progress cache outlives this screen -- it lives in a Scripts
+-- file, which is loaded once per theme -- so a chart passed since the last visit would
+-- otherwise still read as unpassed. This file's scope runs once per screen load, before
+-- any wheel row has been Set, which is exactly when to drop it.
+FolderProgressInvalidate()
+
 local af = Def.ActorFrame{
 	-- GameplayReloadCheck is a kludgy global variable used in ScreenGameplay in.lua to check
 	-- if ScreenGameplay is being entered "properly" or being reloaded by a scripted mod-chart.

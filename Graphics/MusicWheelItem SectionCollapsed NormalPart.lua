@@ -39,6 +39,11 @@ if ThemePrefs.Get("SongSelectBG") ~= "Off" then
 	}
 end
 
+-- Charts cleared / charts available in this pack, at the difficulty on the wheel. This
+-- is the folder lamp idea below, done as a figure and with the walk cached -- see
+-- Scripts/SL-Helpers-FolderProgress.lua for why the original had to be switched off.
+af[#af+1] = LoadActor("./MusicWheelItem GroupProgress.lua")
+
 return af
 
 
