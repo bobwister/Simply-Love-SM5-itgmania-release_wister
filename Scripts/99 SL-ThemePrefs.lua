@@ -231,12 +231,9 @@ SL_CustomPrefs.Get = function()
 			Choices = { THEME:GetString("ThemePrefs","Yes"), THEME:GetString("ThemePrefs", "No") },
 			Values  = { true, false }
 		},
-		AllowScreenSelectStyle =
-		{
-			Default = true,
-			Choices = { THEME:GetString("ThemePrefs","Yes"), THEME:GetString("ThemePrefs", "No") },
-			Values  = { true, false }
-		},
+		-- AllowScreenSelectStyle was here. It is gone: setting it to No did exactly what
+		-- Preferred Style (AutoStyle) = Single already does, in every coin mode, and
+		-- AutoStyle can also force Versus or Double. See Branch.AfterScreenSelectColor.
 		AllowScreenSelectCasual =
 		{
 			Default = true,

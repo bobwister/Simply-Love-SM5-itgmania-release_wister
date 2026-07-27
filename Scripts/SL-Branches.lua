@@ -74,13 +74,10 @@ end
 Branch.AfterScreenSelectColor = function()
 	local preferred_style = ThemePrefs.Get("AutoStyle")
 
-	-- "Allow Select game mode" = No: force Single instead of showing ScreenSelectStyle,
-	-- the same way AutoStyle already forces a specific style. Only kicks in when AutoStyle
-	-- itself isn't already dictating a style.
-	if preferred_style == "none" and not ThemePrefs.Get("AllowScreenSelectStyle") then
-		preferred_style = "single"
-	end
-
+	-- An AllowScreenSelectStyle pref used to force "single" here when AutoStyle was
+	-- "none". It was redundant: that is what AutoStyle = "single" does, and both paths
+	-- then met the same pay-mode guard below, so the two settings could not be told
+	-- apart in any coin mode. Set Preferred Style to 1 Player to skip this screen.
 	if preferred_style ~= "none"
 	-- AutoStyle should not be possible in pay mode
 	-- it's too confusing for machine operators, novice players, and developers alike
