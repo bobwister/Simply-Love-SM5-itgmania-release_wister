@@ -72,6 +72,14 @@ local af = Def.ActorFrame{
 	-- Banner Art
 	LoadActor("./Banner.lua"),
 
+	-- Left half of the column's bottom card: avatar, name, ITL ranking points, the
+	-- star-lamp tally and the cleared count.
+	LoadActor("./PlayerCard.lua"),
+
+	-- Right half of it: the selected chart's machine leaderboard. Inert when the
+	-- GrooveStats scorebox is available, which owns that card instead.
+	LoadActor("./LocalLeaderboard.lua"),
+
 	-- Footer content: session/in-song clocks (moved down out of the header) and
 	-- the GrooveStats connection light.
 	LoadActor("./Footer.lua"),

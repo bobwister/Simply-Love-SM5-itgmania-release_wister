@@ -159,7 +159,9 @@ for i=1, 5 do
 	Grid[#Grid+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="MeterLabel_"..i,
 		InitCommand=function(self)
-			self:xy(chip_x, 8):zoom(0.38):maxwidth((SSM.chip.w - 4) / 0.38)
+			-- 7, not 8: the chip lost 4px of height when the stats pane moved into the
+			-- column above it, and the tick along its bottom edge now starts at y=11.
+			self:xy(chip_x, 7):zoom(0.38):maxwidth((SSM.chip.w - 4) / 0.38)
 			self:diffuse(HUD_LABEL)
 		end,
 		SetCommand=function(self, params)

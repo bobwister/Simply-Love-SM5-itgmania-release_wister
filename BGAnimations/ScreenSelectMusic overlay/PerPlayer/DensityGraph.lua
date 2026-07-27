@@ -6,11 +6,27 @@ if GAMESTATE:IsCourseMode() then return end
 local player = ...
 local pn = ToEnumShortString(player)
 
--- Height and width of the density graph.
-local height = 64
+-- Height and width of the density graph, both from Scripts/SL-Layout-SelectMusic.lua.
+--
+-- The height was a hardcoded 64 while only the y came from the layout table, so the graph
+-- kept its old size when the card around it changed and spilled over the cards above and
+-- below. This card is the one that absorbs the stack's slack, so its height is not a
+-- constant -- see the density_h comment in the layout table.
+local height = SSM.cards.density.h
 local width = SSM.column.w
 
+-- The stream breakdown caption along the graph's bottom edge.
+--
+-- Same text scale as the chart counts in the stats pane (PaneDisplay.lua), so the two
+-- read as one HUD rather than as two panels with their own ideas about type size -- it
+-- used to be 0.8, noticeably larger than anything else in the column. The strip is
+-- 4px shorter to match, which the histogram above it gets back.
+-- TWEAK: keep BREAKDOWN_ZOOM in step with text_zoom in PaneDisplay.lua.
+local BREAKDOWN_ZOOM = WideScale(0.58, 0.65)
+local BREAKDOWN_H    = 13
+
 local marquee_index
+
 local text_table = {}
 local leaving_screen = false
 local breakdown_table = {}
@@ -174,94 +190,15 @@ af2[#af2+1] = NPS_Histogram_Stroke(player, width, height)..{
 }
 af2[#af2]["CurrentSteps"..pn.."ChangedMessageCommand"] = nil
 
--- The Peak NPS text
-af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	Name="NPS",
-	Text="",
-	InitCommand=function(self)
-		self:zoom(0.8)
-		if #GAMESTATE:GetHumanPlayers() == 1 then 
-			self:settext("Peak NPS: \nPeak eBPM: ")
-			self:horizalign(left)
-			self:y(-50)
-			if player == PLAYER_1 then
-				self:x(60)
-			else					
-				self:x(-136)
-			end
-		else
-			self:horizalign("right")
-			self:y(-40)
-			if player == PLAYER_1 then 
-				self:x(140)
-			else
-				self:x(-55)
-			end
-			self:settext("Peak NPS: ")		
-		end
-		-- We want black text in Rainbow mode except during HolidayCheer(), white otherwise.
-		self:diffuse((ThemePrefs.Get("RainbowMode") and not HolidayCheer()) and {0, 0, 0, 1} or {1, 1, 1, 1})
-	end,
-	HideCommand=function(self)
-		if #GAMESTATE:GetHumanPlayers() == 1 then 
-			self:settext("Peak NPS: \nPeak eBPM: ")
-		else
-			self:settext("Peak NPS: ")
-		end
-		self:visible(false)
-	end,
-	RedrawCommand=function(self)
-		if leaving_screen then return end
-		if SL[pn].Streams.PeakNPS ~= 0 then
-			local nps = SL[pn].Streams.PeakNPS * SL.Global.ActiveModifiers.MusicRate
-			if #GAMESTATE:GetHumanPlayers() == 1 then 
-				self:horizalign("left")
-				self:y(-50)
-				if player == PLAYER_1 then
-					self:x(60)
-				else					
-					self:x(-136)
-				end
-				self:settext(("Peak NPS: %.1f\nPeak eBPM: %.0f"):format(nps,nps*15))
-			else
-				self:horizalign("right")
-				self:y(-40)
-				if player == PLAYER_1 then 
-					self:x(140)
-				else
-					self:x(-55)
-				end
-				marquee_index = 0
-				text_table = {}
-				table.insert(text_table,("Peak NPS: %.1f"):format(nps))
-				table.insert(text_table,("Peak eBPM: %.1f"):format(nps*15))
-				self:finishtweening():playcommand("Marquee",{text_table=text_table})
-			end
-			self:visible(not showPatternInfo)
-		end
-	end,
-	MarqueeCommand=function(self)
-		marquee_index = (marquee_index % #text_table) + 1
-		if #GAMESTATE:GetHumanPlayers() > 1 then 
-			self:settext(text_table[marquee_index])
-			self:sleep(2):queuecommand("Marquee")
-		end
-	end,
-	OffCommand=function(self)
-		leaving_screen = true
-		self:stoptweening()
-	end,
-	TogglePatternInfoCommand=function(self)
-		self:visible(not showPatternInfo)
-	end
-}
+-- The Peak NPS / eBPM readout used to be drawn here. It moved into the song description
+-- card, between BPM and LENGTH, where it reads as part of the chart's vital statistics --
+-- see SongDescription.lua, which picks it up off the <pn>ChartParsed broadcast above.
 
 -- Breakdown
 af2[#af2+1] = Def.ActorFrame{
 	Name="Breakdown",
 	InitCommand=function(self)
-		local actorHeight = 17
-		self:addy(height/2 - actorHeight/2)
+		self:addy(height/2 - BREAKDOWN_H/2)
 	end,
 	HideCommand=function(self)
 		self:visible(false)
@@ -274,10 +211,9 @@ af2[#af2+1] = Def.ActorFrame{
 	end,
 	Def.Quad{
 		InitCommand=function(self)
-			local bgHeight = 17
 			-- caption strip under the graph; kept a touch darker than the panels
-			-- behind it so the peak-NPS text reads against the graph
-			self:diffuse(color("#05080A")):zoomto(width, bgHeight):diffusealpha(0.75)
+			-- behind it so the breakdown text reads against the histogram
+			self:diffuse(color("#05080A")):zoomto(width, BREAKDOWN_H):diffusealpha(0.75)
 		end
 	},
 
@@ -285,23 +221,20 @@ af2[#af2+1] = Def.ActorFrame{
 		Text="",
 		Name="BreakdownText",
 		InitCommand=function(self)
-			local textHeight = 17
-			local textZoom = 0.8
-			self:maxwidth(width/textZoom):zoom(textZoom)
+			self:maxwidth(width/BREAKDOWN_ZOOM):zoom(BREAKDOWN_ZOOM)
 		end,
 		HideCommand=function(self)
 			self:settext("")
 		end,
 		RedrawCommand=function(self)
 			if leaving_screen then return end
-			local textZoom = 0.8
 			breakdown_table = {}
 			marquee_index = 0
 			self:settext(GenerateBreakdownText(pn, 0))
 			breakdown_table[1] = GenerateBreakdownText(pn, 0)
 			local minimization_level = 1
-			while self:GetWidth() > (width/textZoom*(1+minimization_level*0.1)) and minimization_level < 4 do
-				if self:GetWidth() < (width/textZoom*(1.7)) then
+			while self:GetWidth() > (width/BREAKDOWN_ZOOM*(1+minimization_level*0.1)) and minimization_level < 4 do
+				if self:GetWidth() < (width/BREAKDOWN_ZOOM*(1.7)) then
 					breakdown_table[2] = GenerateBreakdownText(pn, minimization_level-1)
 				end
 				self:settext(GenerateBreakdownText(pn, minimization_level))

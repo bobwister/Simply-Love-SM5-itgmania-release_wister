@@ -143,20 +143,67 @@ af[#af+1] = Def.ActorFrame{
 
 -- -----------------------------------------------------------------------
 -- right: GrooveStats connection light
+--
+-- The light reports the actual state of the connection rather than just "on or off":
+--
+--   grey     GrooveStats switched off in the theme options
+--   spinner  a handshake is in flight
+--   red      switched on, but we are not connected
+--   amber    connected, but the server has refused one of the services
+--   green    connected, everything allowed
+--
+-- It also RETRIES. The handshake used to be attempted only on ScreenTitleMenu, so a
+-- machine that started with the network down stayed offline for the rest of the run --
+-- see the GrooveStatsRetry handler in BGAnimations/ScreenSystemLayer overlay.lua, which
+-- owns the request. One attempt per visit to this screen: GrooveStats rate-limits, and
+-- this is the screen a player sits on.
+
+local GS_GREY   = color("#5A6A72")
+local GS_RED    = color("#C4444B")
+local GS_AMBER  = color("#FFE84D")
+local GS_GREEN  = color("#5CE087")
+
+-- Give up on the spinner a little after the request's own 10s timeout.
+local GS_RETRY_TIMEOUT = 12
+
+local gs_connecting = false
 
 af[#af+1] = Def.ActorFrame{
 	InitCommand=function(self) self:xy(_screen.w - 14, footer_cy) end,
-	OnCommand=function(self) self:playcommand("RefreshStatus") end,
+	OnCommand=function(self)
+		self:playcommand("RefreshStatus")
+		self:queuecommand("MaybeRetry")
+	end,
 	ScreenChangedMessageCommand=function(self) self:playcommand("RefreshStatus") end,
+
+	MaybeRetryCommand=function(self)
+		if not ThemePrefs.Get("EnableGrooveStats") then return end
+		if SL.GrooveStats.IsConnected then return end
+
+		gs_connecting = true
+		self:playcommand("RefreshStatus")
+		MESSAGEMAN:Broadcast("GrooveStatsRetry")
+		self:stoptweening():sleep(GS_RETRY_TIMEOUT):queuecommand("RetryGaveUp")
+	end,
+
+	-- Nothing came back. Fall through to whatever SL.GrooveStats says, which will be red.
+	RetryGaveUpCommand=function(self)
+		gs_connecting = false
+		self:playcommand("RefreshStatus")
+	end,
+
+	-- Broadcast once the handshake resolves, success or failure.
+	GrooveStatsSessionResolvedMessageCommand=function(self)
+		gs_connecting = false
+		self:stoptweening()
+		self:playcommand("RefreshStatus")
+	end,
 
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="GSLabel",
 		Text="GROOVESTATS",
 		InitCommand=function(self)
 			self:horizalign(right):zoom(label_zoom):diffuse(label_color)
-		end,
-		RefreshStatusCommand=function(self)
-			self:visible(ThemePrefs.Get("EnableGrooveStats"))
 		end
 	},
 
@@ -170,25 +217,45 @@ af[#af+1] = Def.ActorFrame{
 			self:x( -(label:GetWidth() * label:GetZoom()) - 9 )
 		end,
 		RefreshStatusCommand=function(self)
-			if not ThemePrefs.Get("EnableGrooveStats") then
-				self:visible(false)
-				return
-			end
+			-- the spinner stands in for the square while a handshake is in flight
+			if gs_connecting then self:visible(false); return end
+
 			self:visible(true):stopeffect()
 
-			local gs = SL.GrooveStats
-			if gs.GetScores and gs.Leaderboard and gs.AutoSubmit then
-				-- everything up: steady green
-				self:diffuse(color("#5CE087"))
-			elseif gs.IsConnected then
-				-- reachable but some service is refused: amber, pulsing
-				self:diffuse(color("#FFE84D"))
-				self:diffuseshift():effectperiod(2)
-				self:effectcolor1(color("#FFE84D"))
-				self:effectcolor2(color("#8A7A18"))
-			else
-				self:diffuse(color("#C4444B"))
+			if not ThemePrefs.Get("EnableGrooveStats") then
+				self:diffuse(GS_GREY)
+				return
 			end
+
+			local gs = SL.GrooveStats
+			if not gs.IsConnected then
+				self:diffuse(GS_RED)
+			elseif gs.GetScores and gs.Leaderboard and gs.AutoSubmit then
+				self:diffuse(GS_GREEN)
+			else
+				-- connected, but the server refused something: amber, pulsing
+				self:diffuse(GS_AMBER)
+				self:diffuseshift():effectperiod(2)
+				self:effectcolor1(GS_AMBER)
+				self:effectcolor2(color("#8A7A18"))
+			end
+		end
+	},
+
+	-- Same spinner the title screen shows beside "GrooveStats" while it waits
+	-- (Scripts/SL-Helpers-GrooveStats.lua). Its frames are 200px square, so it is sized
+	-- rather than zoomed by a factor.
+	Def.Sprite{
+		Name="StatusSpinner",
+		Texture=THEME:GetPathG("", "LoadingSpinner 10x3.png"),
+		Frames=Sprite.LinearFrames(30, 1),
+		InitCommand=function(self)
+			self:zoomto(11, 11):diffuse(GS_AMBER):visible(false)
+			local label = self:GetParent():GetChild("GSLabel")
+			self:x( -(label:GetWidth() * label:GetZoom()) - 9 )
+		end,
+		RefreshStatusCommand=function(self)
+			self:visible(gs_connecting)
 		end
 	},
 }

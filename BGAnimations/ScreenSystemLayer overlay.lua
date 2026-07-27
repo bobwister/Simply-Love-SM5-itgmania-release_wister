@@ -487,6 +487,23 @@ t[#t+1] = Def.ActorFrame{
 		end
 	end,
 
+	-- Retry the handshake from somewhere other than the title screens.
+	--
+	-- This frame lives in the system layer, so it outlives every screen and is the only
+	-- thing in the theme that knows how to open a GrooveStats session -- but it only ever
+	-- did so on ScreenTitleMenu / ScreenTitleJoin. A machine that booted with the network
+	-- down therefore stayed marked offline for the whole run, with no way back short of
+	-- returning to the title screen.
+	--
+	-- Broadcast by the ScreenSelectMusic footer's connection light, which is where a
+	-- player actually notices the connection is missing. The frame stays hidden; only
+	-- SL.GrooveStats.* is being refreshed.
+	GrooveStatsRetryMessageCommand=function(self)
+		if ThemePrefs.Get("EnableGrooveStats") and not SL.GrooveStats.IsConnected then
+			self:playcommand("SendRequest")
+		end
+	end,
+
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="GrooveStats",
 		Text="     GrooveStats",
@@ -555,7 +572,14 @@ t[#t+1] = Def.ActorFrame{
 					endpoint="new-session.php?chartHashVersion="..SL.GrooveStats.ChartHashVersion,
 					method="GET",
 					timeout=10,
-					callback=NewSessionRequestProcessor,
+					-- Wrapped rather than passed straight through so the broadcast covers
+					-- every path out of the processor, including its early returns.
+					-- Anything showing connection state -- the SelectMusic footer light --
+					-- waits on this instead of polling SL.GrooveStats.
+					callback=function(res, args)
+						NewSessionRequestProcessor(res, args)
+						MESSAGEMAN:Broadcast("GrooveStatsSessionResolved")
+					end,
 					args=self:GetParent()
 				})
 			end

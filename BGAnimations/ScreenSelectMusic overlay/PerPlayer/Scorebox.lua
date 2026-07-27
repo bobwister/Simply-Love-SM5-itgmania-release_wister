@@ -1,29 +1,51 @@
--- No need to get GS scores for courses
-if GAMESTATE:IsCourseMode() then return end
-
--- Don't display if Music Wheel GS integration isn't set to Scorebox.
-if ThemePrefs.Get("MusicWheelGS") ~= "Scorebox" then return end
-
 local player = ...
 local pn = ToEnumShortString(player)
 
-if (not IsServiceAllowed(SL.GrooveStats.GetScores) or
-		SL[pn].ApiKey == "") then
-	return
-end
+-- No GS scores for courses, none unless Music Wheel GS integration is set to Scorebox,
+-- and none without a reachable service and an API key on the profile. That test lives in
+-- Scripts/SL-Layout-SelectMusic.lua because LocalLeaderboard.lua has to answer the same
+-- question the other way round: it takes this card whenever this box gives it up.
+if not SSM_GrooveStatsBoxActive(player) then return end
 
 local n = player==PLAYER_1 and "1" or "2"
 local IsNotWide = (GetScreenAspectRatio() < 16/9)
 local NoteFieldIsCentered = (GetNotefieldX(player) == _screen.cx)
-local NumEntries = 5
+-- Rows on the board. GrooveStats is asked for this many (maxLeaderboardResults);
+-- AutoSubmitScore.lua already asks for 10, so the server is happy above five.
+-- TWEAK: has to stay in step with row_zoom below -- eight rows only fit because the
+-- type came down from 0.87.
+local NumEntries = 8
 
 -- Technique HUD: a hairline rule rather than a thick frame. The border quad is
 -- drawn behind the body, so this is the amount it peeks out on each side, and
 -- it stays the per-source tint (GrooveStats blue / RPG yellow / ITL pink) that
 -- tells you which leaderboard is currently on screen.
 local border = 2
-local width = 162
-local height = 80
+-- Size and position both come from Scripts/SL-Layout-SelectMusic.lua: this leaderboard is
+-- the right half of the left column's bottom card now, sharing that band with the player
+-- card, rather than a 162px box floating on the wheel side of the screen at cx+80.
+local width = SSM.scorebox.w
+local height = SSM.scorebox.h
+
+-- Row metrics, matched to LocalLeaderboard.lua so the card looks the same whichever of
+-- the two owns it -- eight rows of dense HUD type rather than five large ones.
+--
+-- A Miso line's visible band at 0.55 is 8.25px, leaving ~1.8px of leading in a row.
+local row_zoom = 0.55
+local ROW_H    = height / NumEntries
+
+-- Column anchors, from the card's centre.
+local RANK_X  = -width/2 + 18   -- right-aligned
+local NAME_X  = -width/2 + 21   -- left-aligned
+local SCORE_X =  width/2 - 3    -- right-aligned
+local CROWN_X = -width/2 + 10
+
+-- maxwidth is in UNZOOMED font units, so the screen-space budget is divided by the zoom.
+-- Derived rather than the flat 200 it used to be: that was ~174px of name in a 313px-wide
+-- box. SCORE_PX is the widest score string ("100.00", no percent sign here) at row_zoom,
+-- which is what the name has to stop short of.
+local SCORE_PX = 26
+local name_maxwidth = math.floor(((SCORE_X - SCORE_PX - 3) - NAME_X) / row_zoom)
 
 -- Smoked glass rather than flat black, matching the wheel rows and the
 -- left-column cards. Used both when the body is built and when it is faded back
@@ -126,6 +148,40 @@ local SetScoreData = function(data_idx, score_idx, rank, name, score, isSelf, is
 	end
 end
 
+-- Load one of the four leaderboards into its slots.
+--
+-- Six near-identical copies of this used to be inlined below, each walking the response
+-- straight into consecutive slots -- which meant a board longer than the box lost its tail,
+-- taking the player's own row and their rivals' with it. Collect first, let
+-- SelectLeaderboardRows (Scripts/SL-Helpers-Leaderboard.lua) decide which rows survive,
+-- then write.
+--
+-- onSelf runs during collection, so the ITL board's side effects still fire for the
+-- player's entry whether or not that entry ends up on screen.
+local FillBoard = function(data_idx, leaderboard, isEx, onSelf)
+	local entries = {}
+	for entry in ivalues(leaderboard) do
+		if onSelf and entry["isSelf"] then onSelf(entry) end
+		entries[#entries+1] = {
+			rank    = tostring(entry["rank"]),
+			name    = entry["name"],
+			score   = string.format("%.2f", entry["score"]/100),
+			isSelf  = entry["isSelf"],
+			isRival = entry["isRival"],
+			isFail  = entry["isFail"],
+		}
+	end
+
+	local shown = SelectLeaderboardRows(entries, NumEntries)
+	for i, e in ipairs(shown) do
+		SetScoreData(data_idx, i, e.rank, e.name, e.score, e.isSelf, e.isRival, e.isFail, isEx)
+	end
+	-- blank the rest, but never slot 1: an empty board keeps its "No Scores" placeholder
+	for i = math.max(2, #shown + 1), NumEntries do
+		SetScoreData(data_idx, i, "", "", "", false, false, false, isEx)
+	end
+end
+
 local LeaderboardRequestProcessor = function(res, master)
 	if master == nil then return end
 
@@ -206,95 +262,30 @@ local LeaderboardRequestProcessor = function(res, master)
 		
 		cur_style = 0
 
-		local numEntries = 0
 		if SL["P"..n].ActiveModifiers.ShowEXScore then
 			-- If the player is using EX scoring, then we want to display the EX leaderboard first.		
 			if showEX then
 				if data[playerStr]["exLeaderboard"] then
-					numEntries = 0
-					for entry in ivalues(data[playerStr]["exLeaderboard"]) do
-						numEntries = numEntries + 1
-						SetScoreData(1, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										true
-									)
-					end
-					numEntries = numEntries + 1
-					for i=math.max(2,numEntries),5,1 do
-						SetScoreData(1, i, "", "", "", "", "", "", true)
-					end
+					FillBoard(1, data[playerStr]["exLeaderboard"], true)
 				end
 			end
 
 			if showITG then
 				if data[playerStr]["gsLeaderboard"] then
-					numEntries = 0
-					for entry in ivalues(data[playerStr]["gsLeaderboard"]) do
-						numEntries = numEntries + 1
-						SetScoreData(2, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										boogie_ex
-									)
-					end
-					numEntries = numEntries + 1
-					for i=math.max(2,numEntries),5,1 do
-						SetScoreData(2, i, "", "", "", "", "", "", boogie_ex)
-					end
+					FillBoard(2, data[playerStr]["gsLeaderboard"], boogie_ex)
 				end
 			end
 		else
 			-- Display the main GrooveStats leaderboard first if player is not using EX scoring.
 			if showITG then
 				if data[playerStr]["gsLeaderboard"] then
-					numEntries = 0
-					for entry in ivalues(data[playerStr]["gsLeaderboard"]) do
-						numEntries = numEntries + 1
-						SetScoreData(1, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										boogie_ex
-									)
-					end
-					numEntries = numEntries + 1
-					for i=math.max(2,numEntries),5,1 do
-						SetScoreData(1, i, "", "", "", "", "", "", boogie_ex)
-					end
+					FillBoard(1, data[playerStr]["gsLeaderboard"], boogie_ex)
 				end
 			end
 
 			if showEX then
 				if data[playerStr]["exLeaderboard"] then
-					numEntries = 0
-					for entry in ivalues(data[playerStr]["exLeaderboard"]) do
-						numEntries = numEntries + 1
-						SetScoreData(2, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										true
-									)
-					end
-					numEntries = numEntries + 1
-					for i=math.max(2,numEntries),5,1 do
-						SetScoreData(2, i, "", "", "", "", "", "", true)
-					end
+					FillBoard(2, data[playerStr]["exLeaderboard"], true)
 				end
 			end
 		end
@@ -303,71 +294,26 @@ local LeaderboardRequestProcessor = function(res, master)
 		if showEvents then
 			if data[playerStr]["rpg"] then
 				cur_style = 3
-				local numEntries = 0
 				SetScoreData(3, 1, "", "No Scores", "", false, false, false)
 
 				if data[playerStr]["rpg"]["rpgLeaderboard"] then
-					for entry in ivalues(data[playerStr]["rpg"]["rpgLeaderboard"]) do
-						numEntries = numEntries + 1
-						SetScoreData(3, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										false
-									)
-					end
-					numEntries = numEntries + 1
-					for i=numEntries,5,1 do
-						SetScoreData(3, i,
-										"",
-										"",
-										"",
-										false,
-										false,
-										false)
-					end
+					FillBoard(3, data[playerStr]["rpg"]["rpgLeaderboard"], false)
 				end
 			end
 
 			if data[playerStr]["itl"] then
 				cur_style = 4
-				local numEntries = 0
 				SetScoreData(4, 1, "", "No Scores", "", false, false, false)
 
 				if data[playerStr]["itl"]["itlLeaderboard"] then
-					for entry in ivalues(data[playerStr]["itl"]["itlLeaderboard"]) do
-						if entry["isSelf"] then
-							UpdateItlExScore(player, SL[pn].Streams.Hash, entry["score"], GAMESTATE:GetCurrentSong(), GAMESTATE:GetCurrentSteps(player))
-							SL["P"..n].itlScore = entry["score"]
-							local stepartist = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("PerPlayer"):GetChild("StepArtistAF_P"..n)
-							if stepartist ~= nil then
-							  stepartist:queuecommand("ITL")
-							end
+					FillBoard(4, data[playerStr]["itl"]["itlLeaderboard"], true, function(entry)
+						UpdateItlExScore(player, SL[pn].Streams.Hash, entry["score"], GAMESTATE:GetCurrentSong(), GAMESTATE:GetCurrentSteps(player))
+						SL["P"..n].itlScore = entry["score"]
+						local stepartist = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("PerPlayer"):GetChild("StepArtistAF_P"..n)
+						if stepartist ~= nil then
+							stepartist:queuecommand("ITL")
 						end
-						numEntries = numEntries + 1
-						SetScoreData(4, numEntries,
-										tostring(entry["rank"]),
-										entry["name"],
-										string.format("%.2f", entry["score"]/100),
-										entry["isSelf"],
-										entry["isRival"],
-										entry["isFail"],
-										true
-									)
-					end
-					numEntries = numEntries + 1
-					for i=numEntries,5,1 do
-						SetScoreData(4, i,
-										"",
-										"",
-										"",
-										false,
-										false,
-										false)
-					end
+					end)
 				end
 			end
 		end
@@ -381,7 +327,7 @@ local af = Def.ActorFrame{
 	Name="ScoreBox"..pn,
 	InitCommand=function(self)
 		if #GAMESTATE:GetHumanPlayers() == 1 then 
-			self:x(_screen.cx + 80):y(_screen.cy + 160)
+			self:x(SSM.scorebox.cx):y(SSM.cards.bottom.cy)
 			if pn == "P2" then
 				self:y(_screen.cy*1.65 - 55)
 			end
@@ -419,7 +365,7 @@ local af = Def.ActorFrame{
 		if params.Player == player then
 			self:visible(false)
 		end
-		self:x(_screen.cx + 80):y(_screen.cy + 160):zoom(1)
+		self:x(SSM.scorebox.cx):y(SSM.cards.bottom.cy):zoom(1)
 		if pn == "P2" then
 			self:y(_screen.cy*1.65 - 55)
 		end
@@ -449,21 +395,13 @@ local af = Def.ActorFrame{
 
 		self:finishtweening()
 		
-		self:GetChild("Name1"):visible(true)
-		self:GetChild("Name2"):visible(true)
-		self:GetChild("Name3"):visible(true)
-		self:GetChild("Name4"):visible(true)
-		self:GetChild("Name5"):visible(true)
-		self:GetChild("Score1"):visible(true)
-		self:GetChild("Score2"):visible(true)
-		self:GetChild("Score3"):visible(true)
-		self:GetChild("Score4"):visible(true)
-		self:GetChild("Score5"):visible(true)
-		self:GetChild("Rank1"):visible(true)
-		self:GetChild("Rank2"):visible(true)
-		self:GetChild("Rank3"):visible(true)
-		self:GetChild("Rank4"):visible(true)
-		self:GetChild("Rank5"):visible(true)
+		-- one pass over however many rows this box was built with, rather than the
+		-- fifteen hardcoded lines that silently ignored rows 6 and up
+		for i=1,NumEntries do
+			self:GetChild("Name"..i):visible(true)
+			self:GetChild("Score"..i):visible(true)
+			self:GetChild("Rank"..i):visible(true)
+		end
 		self:GetChild("GrooveStatsLogo"):stopeffect()
 		self:GetChild("BoogieStatsLogo"):stopeffect()
 		self:GetChild("BoogieStatsEXLogo"):stopeffect()
@@ -549,21 +487,14 @@ local af = Def.ActorFrame{
 				ResetAllData()
 				
 				self:GetParent():visible(true)
-				self:GetParent():GetChild("Name1"):settext(""):visible(false)
-				self:GetParent():GetChild("Name2"):settext(""):visible(false)
-				self:GetParent():GetChild("Name3"):settext(""):visible(false)
-				self:GetParent():GetChild("Name4"):settext(""):visible(false)
-				self:GetParent():GetChild("Name5"):settext(""):visible(false)
-				self:GetParent():GetChild("Score1"):settext(""):visible(false)
-				self:GetParent():GetChild("Score2"):settext(""):visible(false)
-				self:GetParent():GetChild("Score3"):settext(""):visible(false)
-				self:GetParent():GetChild("Score4"):settext(""):visible(false)
-				self:GetParent():GetChild("Score5"):settext(""):visible(false)
-				self:GetParent():GetChild("Rank1"):diffusealpha(0):visible(false)
-				self:GetParent():GetChild("Rank2"):settext(""):visible(false)
-				self:GetParent():GetChild("Rank3"):settext(""):visible(false)
-				self:GetParent():GetChild("Rank4"):settext(""):visible(false)
-				self:GetParent():GetChild("Rank5"):settext(""):visible(false)
+				for i=1,NumEntries do
+					self:GetParent():GetChild("Name"..i):settext(""):visible(false)
+					self:GetParent():GetChild("Score"..i):settext(""):visible(false)
+					-- rank 1 is the crown sprite, which has no text to clear
+					local rank = self:GetParent():GetChild("Rank"..i)
+					if i == 1 then rank:diffusealpha(0) else rank:settext("") end
+					rank:visible(false)
+				end
 				self:GetParent():GetChild("GrooveStatsLogo"):visible(true):diffusealpha(0.5):glowshift({color("#C8FFFF"), color("#6BF0FF")})
 				self:GetParent():GetChild("BoogieStatsLogo"):visible(false)
 				self:GetParent():GetChild("BoogieStatsEXLogo"):visible(false)
@@ -750,27 +681,27 @@ af[#af+1] = HUDCardDecor(width, height, 0, 0)..{
 }
 
 for i=1,NumEntries do
-	local y = -height/2 + 16 * i - 8
-	local zoom = 0.87
+	local y = -height/2 + ROW_H*i - ROW_H/2
+	local zoom = row_zoom
 
-	-- Band marking the player's own entry. The 80px box holds five 16px rows
-	-- with no headroom for a header, so "which row is me" is carried by a filled
-	-- band behind the row rather than by a label. Reads the same isSelf flag the
-	-- name and score actors use for their text colour.
+	-- Band marking the player's own entry. The box holds NumEntries rows with no
+	-- headroom for a header, so "which row is me" is carried by a filled band behind
+	-- the row rather than by a label. Reads the same isSelf flag the name and score
+	-- actors use for their text colour.
 	af[#af+1] = Def.Quad{
 		Name="SelfBand"..i,
 		InitCommand=function(self)
-			self:setsize(width - 4, 15):xy(0, y)
+			self:setsize(width - 4, ROW_H - 1):xy(0, y)
 			self:diffuse(self_color):diffusealpha(0)
 			if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
-				self:setsize(width - 44, 15)
+				self:setsize(width - 44, ROW_H - 1)
 			end
 		end,
 		PlayerJoinedMessageCommand=function(self)
-			self:setsize(IsNotWide and (width - 44) or (width - 4), 15)
+			self:setsize(IsNotWide and (width - 44) or (width - 4), ROW_H - 1)
 		end,
 		PlayerUnjoinedMessageCommand=function(self)
-			self:setsize(width - 4, 15)
+			self:setsize(width - 4, ROW_H - 1)
 		end,
 		LoopScoreboxCommand=function(self)
 			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
@@ -785,26 +716,23 @@ for i=1,NumEntries do
 		OffCommand=function(self) self:stoptweening() end
 	}
 
-	-- Rank 1 gets a crown.
+	-- Rank 1 gets a crown. Sized to the row rather than by a fixed zoom, which at the
+	-- old 16px pitch was tuned to a row 60% taller than these.
 	if i == 1 then
 		af[#af+1] = Def.Sprite{
 			Name="Rank"..i,
 			Texture=THEME:GetPathG("", "crown.png"),
 			InitCommand=function(self)
-				self:zoom(0.09):xy(-width/2 + 14, y):diffusealpha(0)
+				self:zoomto(ROW_H - 2, ROW_H - 2):xy(CROWN_X, y):diffusealpha(0)
 				if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
-					self:x(-width/2 + 32)
+					self:x(CROWN_X + 18)
 				end
 			end,
 			PlayerJoinedMessageCommand=function(self,params)
-				if IsNotWide then
-					self:x(-width/2 + 32)
-				else
-					self:x(-width/2 + 14)
-				end
+				self:x(IsNotWide and (CROWN_X + 18) or CROWN_X)
 			end,
 			PlayerUnjoinedMessageCommand=function(self,params)
-				self:x(-width/2 + 14)
+				self:x(CROWN_X)
 			end,
 			LoopScoreboxCommand=function(self)
 				self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
@@ -823,27 +751,23 @@ for i=1,NumEntries do
 			Name="Rank"..i,
 			Text="",
 			InitCommand=function(self)
-				self:diffuse(Color.White):xy(-width/2 + 27, y):maxwidth(30):horizalign(right):zoom(zoom)
+				self:diffuse(HUD_LABEL):xy(RANK_X, y):maxwidth(30):horizalign(right):zoom(zoom)
 				if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
-					self:x(-width/2 + 42)
+					self:x(RANK_X + 18)
 				end
 			end,
 			PlayerJoinedMessageCommand=function(self,params)
-				if IsNotWide then
-					self:x(-width/2 + 42)
-				else
-					self:x(-width/2 + 27)
-				end
+				self:x(IsNotWide and (RANK_X + 18) or RANK_X)
 			end,
 			PlayerUnjoinedMessageCommand=function(self,params)
-				self:x(-width/2 + 27)
+				self:x(RANK_X)
 			end,
 			LoopScoreboxCommand=function(self)
 				self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 			end,
 			SetScoreboxCommand=function(self)
 				local score = all_data[cur_style+1]["scores"][i]
-				local clr = Color.White
+				local clr = HUD_LABEL
 				if score.isSelf then
 					clr = self_color
 				elseif score.isRival then
@@ -861,27 +785,27 @@ for i=1,NumEntries do
 		Name="Name"..i,
 		Text="",
 		InitCommand=function(self)
-			self:diffuse(Color.White):xy(-width/2 + 30, y):maxwidth(100):horizalign(left):zoom(zoom)
+			self:diffuse(HUD_TEXT):xy(NAME_X, y):maxwidth(name_maxwidth):horizalign(left):zoom(zoom)
 			if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
-				self:x(-width/2 + 45):maxwidth(70)
+				self:x(NAME_X + 18):maxwidth(70)
 			end
 		end,
 		PlayerJoinedMessageCommand=function(self,params)
 			if IsNotWide then
-				self:x(-width/2 + 45):maxwidth(70)
+				self:x(NAME_X + 18):maxwidth(70)
 			else
-				self:x(-width/2 + 30):maxwidth(100)
+				self:x(NAME_X):maxwidth(name_maxwidth)
 			end
 		end,
 		PlayerUnjoinedMessageCommand=function(self,params)
-			self:x(-width/2 + 30):maxwidth(100)
+			self:x(NAME_X):maxwidth(name_maxwidth)
 		end,
 		LoopScoreboxCommand=function(self)
 			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 		end,
 		SetScoreboxCommand=function(self)
 			local score = all_data[cur_style+1]["scores"][i]
-			local clr = Color.White
+			local clr = HUD_TEXT
 			if score.isSelf then
 				clr = self_color
 			elseif score.isRival then
@@ -898,27 +822,23 @@ for i=1,NumEntries do
 		Name="Score"..i,
 		Text="",
 		InitCommand=function(self)
-			self:diffuse(Color.White):xy(-width/2 + 160, y):horizalign(right):zoom(zoom)
+			self:diffuse(HUD_TEXT):xy(SCORE_X, y):horizalign(right):zoom(zoom)
 			if IsNotWide and #GAMESTATE:GetHumanPlayers() > 1 then
-				self:x(-width/2 + 140)
+				self:x(SCORE_X - 20)
 			end
 		end,
 		PlayerJoinedMessageCommand=function(self,params)
-			if IsNotWide then
-				self:x(-width/2 + 140)
-			else
-				self:x(-width/2 + 160)
-			end
+			self:x(IsNotWide and (SCORE_X - 20) or SCORE_X)
 		end,
 		PlayerUnjoinedMessageCommand=function(self,params)
-			self:x(-width/2 + 160)
+			self:x(SCORE_X)
 		end,
 		LoopScoreboxCommand=function(self)
 			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 		end,
 		SetScoreboxCommand=function(self)
 			local score = all_data[cur_style+1]["scores"][i]
-			local clr = Color.White
+			local clr = HUD_TEXT
 			if score.isFail then
 				clr = Color.Red
 			elseif score.isEx then

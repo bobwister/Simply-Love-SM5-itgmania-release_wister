@@ -20,6 +20,54 @@ ITLSeasonFromGroupName = function(groupName)
 	return group:match("itl%s+online%s+(%d%d%d%d)") or group:match("itl%s+(%d%d%d%d)")
 end
 
+-- Which ITL season this cabinet is on: the newest ITL year among the installed packs.
+--
+-- Read off the song groups rather than off the player's scores, so a season that has
+-- just been installed and not yet played still counts as the current one -- otherwise
+-- the card would go on reporting last season until the first chart was passed. Falls
+-- back to the calendar year when no ITL pack is installed at all, which only matters
+-- for a profile carrying ITL data from a machine that has since dropped the packs.
+--
+-- The song list doesn't change during a run, so this is worked out once and kept.
+local current_season = nil
+ITLCurrentSeason = function()
+	if current_season then return current_season end
+
+	local newest = nil
+	for group in ivalues(SONGMAN:GetSongGroupNames() or {}) do
+		local year = ITLSeasonFromGroupName(group)
+		-- both are 4-digit strings, so a plain string compare orders them
+		if year and (newest == nil or year > newest) then newest = year end
+	end
+
+	current_season = newest or tostring(Year())
+	return current_season
+end
+
+-- How many charts the player has passed in one ITL season.
+--
+-- CalculateITLStats counts itlData["points"], which CalculateITLSongRanks builds from
+-- the WHOLE hashMap -- every season the player has ever scored in, pooled together. Each
+-- entry already records the season it belongs to, so scoping the count is just a filter
+-- on that field.
+--
+-- An entry IS a pass: UpdateItlData only writes one on a run that didn't fail (see the
+-- not stats:GetFailed() guard there), so nothing further has to be checked here.
+--
+-- Charts whose song is no longer installed under a recognisable ITL group carry season
+-- "unknown" and are left out, which is the honest answer -- there is nothing left to say
+-- which season they were from.
+CountITLChartsPassedInSeason = function(player, season)
+	local itlData = SL[ ToEnumShortString(player) ].ITLData
+	if not itlData or not itlData["hashMap"] then return 0 end
+
+	local count = 0
+	for _, data in pairs(itlData["hashMap"]) do
+		if data["season"] == season then count = count + 1 end
+	end
+	return count
+end
+
 UpdatePathMap = function(player, hash)
 	local song = GAMESTATE:GetCurrentSong()
 	local song_dir = song:GetSongDir()

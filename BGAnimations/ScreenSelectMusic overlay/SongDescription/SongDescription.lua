@@ -5,6 +5,30 @@ local group_durations = LoadActor("./GroupDurations.lua")
 -- banner above it and the density graph below (Scripts/SL-Layout-SelectMusic.lua)
 local _w = SSM.column.w
 
+-- TWEAK: text size and the two text rows inside the card. The card's height comes from
+-- SSM.cards.song; these have to fit inside it. At 0.62 a Miso line's visible band is
+-- 9.3px, so two rows 16px apart clear each other by ~7px, which is where the hairline
+-- between them goes.
+local DESC_ZOOM = 0.62
+local ROW1_Y = -8
+local ROW2_Y =  8
+-- where the LENGTH pair sits, relative to the inner frame's origin
+local LENGTH_X = 214
+-- Peak NPS and eBPM, between BPM and LENGTH on the second row, same anchor convention.
+-- TWEAK: NPS_X has to leave room to its left for a wide BPM range like "100-400".
+local NPS_X  = 72
+local EBPM_X = 138
+
+-- Peak NPS for the master player, already scaled by the active music rate. nil until the
+-- chart parser has run, and for a chart with no notes.
+local function GetPeakNPS()
+	local player = GAMESTATE:GetMasterPlayerNumber()
+	if not player then return nil end
+	local streams = SL[ToEnumShortString(player)].Streams
+	if not streams or (streams.PeakNPS or 0) == 0 then return nil end
+	return streams.PeakNPS * SL.Global.ActiveModifiers.MusicRate
+end
+
 local af = Def.ActorFrame{
 	OnCommand=function(self)
 		self:xy(SSM.column.cx, SSM.cards.song.cy)
@@ -21,42 +45,51 @@ local af = Def.ActorFrame{
 -- background Quad for Artist, BPM, and Song Length
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
-		self:setsize( _w, 50 )
+		self:setsize( _w, SSM.cards.song.h )
 		HUDPanel(self)
 
 		if ThemePrefs.Get("RainbowMode") then self:diffusealpha(0.9) end
 	end
 }
 
-af[#af+1] = HUDCardDecor(_w, 50)
+af[#af+1] = HUDCardDecor(_w, SSM.cards.song.h)
 
 -- Hairline splitting the card into its two rows: who wrote the song above, how it
--- plays below. The inner text frame sits at (-100,-6) with the artist line at -11 and
--- the BPM/length line at +10, so -5 here lands in the gap between them.
+-- plays below. The two text rows straddle the card's centre at ROW1_Y and ROW2_Y, so
+-- y=0 lands in the gap between them.
 af[#af+1] = Def.Quad{
 	Name="DescriptionRule",
 	InitCommand=function(self)
-		self:zoomto(_w - 24, 1):y(-5)
+		self:zoomto(_w - 24, 1):y(0)
 		self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.20) )
 	end
 }
 
 -- ActorFrame for Artist, BPM, and Song length
 af[#af+1] = Def.ActorFrame{
-	InitCommand=function(self) self:xy(-100,-6) end,
+	InitCommand=function(self) self:xy(-118, 0) end,
+
+	-- Peak NPS and eBPM come from the chart parser rather than from the song, and parsing is
+	-- deferred (DensityGraph.lua stalls 0.4s before it runs) -- so they refresh on the
+	-- parser's own broadcast, not on this card's Set, which fires long before
+	-- SL[pn].Streams has been filled in.
+	P1ChartParsingMessageCommand=function(self) self:playcommand("ClearNPS") end,
+	P2ChartParsingMessageCommand=function(self) self:playcommand("ClearNPS") end,
+	P1ChartParsedMessageCommand=function(self)  self:playcommand("SetNPS") end,
+	P2ChartParsedMessageCommand=function(self)  self:playcommand("SetNPS") end,
 
 	-- ----------------------------------------
 	-- Artist Label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", GAMESTATE:IsCourseMode() and "NumSongs" or "Artist"):upper(),
-		InitCommand=function(self) self:align(1,0):y(-11):maxwidth(44):diffuse(HUD_LABEL) end,
+		InitCommand=function(self) self:align(1,0.5):y(ROW1_Y):zoom(DESC_ZOOM):maxwidth(70/DESC_ZOOM):diffuse(HUD_LABEL) end,
 	},
 
 	-- Song Artist (or number of Songs in this Course, if CourseMode)
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:align(0,0):xy(5,-11):diffuse(HUD_TEXT) end,
+		InitCommand=function(self) self:align(0,0.5):xy(4,ROW1_Y):zoom(DESC_ZOOM):diffuse(HUD_TEXT) end,
 		SetCommand=function(self)
-			local maxwidth = _w - 60
+			local maxwidth = (_w - 60)/DESC_ZOOM
 
 			if GAMESTATE:IsCourseMode() then
 				local course = GAMESTATE:GetCurrentCourse()
@@ -67,7 +100,7 @@ af[#af+1] = Def.ActorFrame{
 
 				if not GAMESTATE:IsEventMode() and song and (song:IsLong() or song:IsMarathon()) then
 					-- make room for the "COUNTS AS 2/3 ROUNDS" bubble
-					maxwidth = maxwidth - 120
+					maxwidth = maxwidth - 120/DESC_ZOOM
 				end
 			end
 
@@ -80,7 +113,7 @@ af[#af+1] = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", "BPM"):upper(),
 		InitCommand=function(self)
-			self:align(1,0):y(10):diffuse(HUD_LABEL)
+			self:align(1,0.5):y(ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_LABEL)
 		end
 	},
 
@@ -89,7 +122,7 @@ af[#af+1] = Def.ActorFrame{
 		InitCommand=function(self)
 			-- vertical align has to be middle for BPM value in case of split BPMs having a line break
 			self:align(0, 0.5)
-			self:xy(5,17):diffuse(HUD_TEXT):vertspacing(-8)
+			self:xy(4,ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_TEXT):vertspacing(-8)
 		end,
 		SetCommand=function(self)
 
@@ -106,7 +139,7 @@ af[#af+1] = Def.ActorFrame{
 			-- if only one player is joined, stringify the DisplayBPMs and return early
 			if #GAMESTATE:GetHumanPlayers() == 1 then
 				-- StringifyDisplayBPMs() is defined in ./Scipts/SL-BPMDisplayHelpers.lua
-				self:settext(StringifyDisplayBPMs() or ""):zoom(1)
+				self:settext(StringifyDisplayBPMs() or ""):zoom(DESC_ZOOM)
 				return
 			end
 
@@ -117,12 +150,12 @@ af[#af+1] = Def.ActorFrame{
 			-- it's likely that BPM range is the same for both charts
 			-- no need to show BPM ranges for both players if so
 			if p1bpm == p2bpm then
-				self:settext(p1bpm):zoom(1)
+				self:settext(p1bpm):zoom(DESC_ZOOM)
 
 			-- different BPM ranges for the two players
 			else
 				-- show the range for both P1 and P2 split by a newline character, shrunk slightly to fit the space
-				self:settext( "P1 ".. p1bpm .. "\n" .. "P2 " .. p2bpm ):zoom(0.8)
+				self:settext( "P1 ".. p1bpm .. "\n" .. "P2 " .. p2bpm ):zoom(DESC_ZOOM*0.8)
 				-- the "P1 " and "P2 " segments of the string should be grey
 				self:AddAttribute(0,             {Length=3, Diffuse=HUD_LABEL})
 				self:AddAttribute(3+p1bpm:len(), {Length=3, Diffuse=HUD_LABEL})
@@ -146,18 +179,65 @@ af[#af+1] = Def.ActorFrame{
 	},
 
 	-- ----------------------------------------
+	-- Peak NPS and Peak eBPM. Labels are literals: both are untranslatable acronyms, like
+	-- the XO/FS pairs in the stats pane.
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Text="NPS",
+		InitCommand=function(self)
+			self:align(1,0.5):xy(NPS_X, ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_LABEL)
+		end,
+		ClearNPSCommand=function(self) self:visible(false) end,
+		SetNPSCommand=function(self) self:visible(GetPeakNPS() ~= nil) end
+	},
+
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Name="PeakNPS",
+		Text="",
+		InitCommand=function(self)
+			self:align(0,0.5):xy(NPS_X + 4, ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_TEXT)
+		end,
+		ClearNPSCommand=function(self) self:settext("") end,
+		SetNPSCommand=function(self)
+			local nps = GetPeakNPS()
+			self:settext( nps and ("%.1f"):format(nps) or "" )
+		end
+	},
+
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Text="eBPM",
+		InitCommand=function(self)
+			self:align(1,0.5):xy(EBPM_X, ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_LABEL)
+		end,
+		ClearNPSCommand=function(self) self:visible(false) end,
+		SetNPSCommand=function(self) self:visible(GetPeakNPS() ~= nil) end
+	},
+
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Name="PeakEBPM",
+		Text="",
+		InitCommand=function(self)
+			self:align(0,0.5):xy(EBPM_X + 4, ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_TEXT)
+		end,
+		ClearNPSCommand=function(self) self:settext("") end,
+		SetNPSCommand=function(self)
+			local nps = GetPeakNPS()
+			self:settext( nps and ("%.0f"):format(nps * 15) or "" )
+		end
+	},
+
+	-- ----------------------------------------
 	-- Song Duration Label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=THEME:GetString("SongDescription", "Length"):upper(),
 		InitCommand=function(self)
-			self:align(1,0):diffuse(HUD_LABEL)
-			self:x(_w-130):y(10)
+			self:align(1,0.5):zoom(DESC_ZOOM):diffuse(HUD_LABEL)
+			self:xy(LENGTH_X, ROW2_Y)
 		end
 	},
 
 	-- Song Duration Value
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		InitCommand=function(self) self:align(0,0):xy(_w-130 + 5, 10):diffuse(HUD_TEXT) end,
+		InitCommand=function(self) self:align(0,0.5):xy(LENGTH_X + 4, ROW2_Y):zoom(DESC_ZOOM):diffuse(HUD_TEXT) end,
 		SetCommand=function(self)
 			if MusicWheel == nil then MusicWheel = SCREENMAN:GetTopScreen():GetMusicWheel() end
 

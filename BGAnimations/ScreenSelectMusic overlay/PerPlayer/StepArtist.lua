@@ -4,6 +4,34 @@ local p = PlayerNumber:Reverse()[player]
 
 local text_table, marquee_index
 
+-- Card geometry, from Scripts/SL-Layout-SelectMusic.lua. This frame's origin is the
+-- card's TOP-LEFT corner, so every offset below is measured from there -- the old
+-- 120/18 pair was measured from a frame origin that sat outside the card entirely.
+--
+-- APPEAR_LIFT: the AppearP1 tween lifts this frame 30px on entry, so the frame has to
+-- start 30px below where it settles.
+local CARD_W = SSM.column.w
+local CARD_H = SSM.cards.artist.h
+local APPEAR_LIFT = 30
+
+-- TWEAK: text size in the card, and where the STEPS label and the credit sit.
+--
+-- CREDIT_Y is the top of the text block, so it is also the card's top margin -- the text
+-- used to start 1px in, which read as no margin at all on the common one-line credit. A
+-- Miso line at 0.55 is 13.2px, so three credit lines from CREDIT_Y need 40px of CARD_H.
+local CARD_ZOOM   = 0.55
+local LABEL_X     = 10
+local CREDIT_X    = 50
+local CREDIT_Y    = 4
+local CREDIT_MAXW = 330
+
+-- The difficulty hue over the card, as a vertical gradient rather than a flat wash:
+-- strongest along the top edge, almost gone by the bottom. Same idea as the difficulty
+-- rule along the top of the stats pane, just spread over the card.
+-- TWEAK: the two ends of the gradient.
+local DIFFICULTY_TINT_TOP    = 0.32
+local DIFFICULTY_TINT_BOTTOM = 0.04
+
 -- EX score is a number like 92.67
 local GetPointsForSong = function(maxPoints, exScore)
 	local thresholdEx = 50.0
@@ -74,15 +102,11 @@ return Def.ActorFrame{
 		if player == PLAYER_1 then
 
 			if GAMESTATE:IsCourseMode() then
-				self:x( _screen.cx - (IsUsingWideScreen() and 356 or 346))
+				self:x( SSM.column.left )
 				self:y(_screen.cy + 32)
 			else
-				self:x( _screen.cx - (IsUsingWideScreen() and 356 or 346))
-				-- Vertical band from Scripts/SL-Layout-SelectMusic.lua. Two offsets have
-				-- to be undone to land on it: the card quad below hangs 18px under this
-				-- frame's origin, and the AppearP1 tween lifts the whole frame 30px on
-				-- entry, so the frame has to start 30px below where it settles.
-				self:y( SSM.cards.artist.cy - 18 + 30 )
+				self:x( SSM.column.left )
+				self:y( SSM.cards.artist.top + APPEAR_LIFT )
 			end
 
 		elseif player == PLAYER_2 then
@@ -101,57 +125,56 @@ return Def.ActorFrame{
 		end
 	end,
 
-	-- colored background quad
+	-- The card's own ink, the same HUD_PANEL_COLOR every other panel in this column uses,
+	-- so the stack reads as one set of cards.
+	--
+	-- This used to be a single quad diffused with a dimmed difficulty colour, which meant
+	-- the difficulty hue REPLACED the shared ink instead of sitting on it -- and a
+	-- fadebottom scaled to the credit line count erased most of the fill (80% of it for a
+	-- one-line credit). The hue is now a separate translucent layer below, and there is no
+	-- fade: the card is sized to its content, so it has nothing to fade out.
 	Def.Quad{
 		Name="BackgroundQuad",
-		InitCommand=function(self) 
-			self:diffuse(color("#000000"))
+		InitCommand=function(self)
 			if #GAMESTATE:GetHumanPlayers() == 1 then
-				self:zoomto(190, _screen.h/8):x(120):y(18)
+				self:zoomto(CARD_W, CARD_H):x(CARD_W/2):y(CARD_H/2)
 			else
 				self:zoomto(175, _screen.h/28):x(113):y(0)
 			end
-		end,
-		ResetCommand=function(self)
-			local StepsOrTrail = GAMESTATE:IsCourseMode() and GAMESTATE:GetCurrentTrail(player) or GAMESTATE:GetCurrentSteps(player)
-			if #GAMESTATE:GetHumanPlayers() == 1 then
-				self:zoomto(190, _screen.h/8):x(120):y(18)
-			else
-				self:zoomto(175, _screen.h/28):x(113):y(0)
-			end
-			if StepsOrTrail then
-				-- Technique HUD: keep the difficulty hue as the signal, but dark
-				-- enough to be a card rather than a colored slab.
-				local difficulty = StepsOrTrail:GetDifficulty()
-				self:diffuse( DimColor(DifficultyColor(difficulty), 0.24, 0.90) )
-				text_table = GetStepsCredit(player)
-				if #GAMESTATE:GetHumanPlayers() == 1 then 
-					if #text_table == 3 then
-						self:fadebottom(0)
-					elseif #text_table == 2 then
-						self:fadebottom(0.5)
-					elseif #text_table == 1 then
-						self:fadebottom(0.8)
-					end
-				else 
-					self:fadebottom(0)
-				end
-			else
-				self:diffuse( DimColor(PlayerColor(player), 0.24, 0.90) )
-			end
+			HUDPanel(self)
 		end
 	},
 
-	-- Top-left bracket only: this panel's bottom edge is faded out by a
-	-- fadebottom that varies with how many credit lines the chart has, so a
-	-- bottom-right bracket would hang in empty space.
-	HUDCardDecor(190, _screen.h/8, 120, 18, "tl"),
+	-- The difficulty hue, over the ink.
+	--
+	-- diffusetopedge / diffusebottomedge set the quad's two pairs of vertex colours
+	-- independently, which is what makes the gradient -- so this must NOT be followed by a
+	-- diffuse() or diffusealpha(), either of which would flatten all four corners again.
+	Def.Quad{
+		Name="DifficultyTint",
+		InitCommand=function(self)
+			if #GAMESTATE:GetHumanPlayers() == 1 then
+				self:zoomto(CARD_W, CARD_H):x(CARD_W/2):y(CARD_H/2)
+			else
+				self:zoomto(175, _screen.h/28):x(113):y(0)
+			end
+			self:diffusealpha(0)
+		end,
+		ResetCommand=function(self)
+			local StepsOrTrail = GAMESTATE:IsCourseMode() and GAMESTATE:GetCurrentTrail(player) or GAMESTATE:GetCurrentSteps(player)
+			local hue = StepsOrTrail and DifficultyColor(StepsOrTrail:GetDifficulty()) or PlayerColor(player)
+			self:diffusetopedge(    { hue[1], hue[2], hue[3], DIFFICULTY_TINT_TOP    } )
+			self:diffusebottomedge( { hue[1], hue[2], hue[3], DIFFICULTY_TINT_BOTTOM } )
+		end
+	},
+
+	HUDCardDecor(CARD_W, CARD_H, CARD_W/2, CARD_H/2),
 
 	--STEPS label
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text=GAMESTATE:IsCourseMode() and Screen.String("SongNumber"):format(1) or Screen.String("STEPS"),
 		InitCommand=function(self)
-			self:diffuse(color("#7C939E")):horizalign(left):x(40):maxwidth(40):zoom(0.8)
+			self:diffuse(HUD_LABEL):halign(0):valign(0):xy(LABEL_X, CREDIT_Y):maxwidth(60/CARD_ZOOM):zoom(CARD_ZOOM)
 		end,
 		UpdateTrailTextMessageCommand=function(self, params)
 			self:settext( THEME:GetString("ScreenSelectCourse", "SongNumber"):format(params.index) )
@@ -161,13 +184,15 @@ return Def.ActorFrame{
 	--stepartist text
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		InitCommand=function(self)
-			self:diffuse(color("#E8F1F4")):horizalign(left):zoom(0.8)
+			-- valign(0) here and on the STEPS label above: both line boxes then start on the
+			-- same y, which is the only way to be sure the two line up.
+			self:diffuse(HUD_TEXT):halign(0):valign(0):y(CREDIT_Y):zoom(CARD_ZOOM)
 			if GAMESTATE:IsCourseMode() then
 				self:x(70):maxwidth(138)
 			else
-				self:x(80):diffuse(color("#E8F1F4"))
+				self:x(CREDIT_X):diffuse(HUD_TEXT)
 				if #GAMESTATE:GetHumanPlayers() == 1 then 
-					self:maxwidth(175)
+					self:maxwidth(CREDIT_MAXW)
 				else
 					self:maxwidth(160)
 				end
@@ -191,9 +216,9 @@ return Def.ActorFrame{
 				-- to ensure it stays synced with the scrolling list of songs
 				if not GAMESTATE:IsCourseMode() then
 					-- only queue a Marquee if there are things in the text_table to display
-					self:x(80):diffuse(color("#E8F1F4"))
+					self:x(CREDIT_X):diffuse(HUD_TEXT)
 					if #GAMESTATE:GetHumanPlayers() == 1 then 
-						self:maxwidth(175)
+						self:maxwidth(CREDIT_MAXW)
 					else
 						self:maxwidth(160)
 					end
@@ -205,7 +230,7 @@ return Def.ActorFrame{
 							local curText = text_table[i]
 							fulldesc = fulldesc .. curText .. "\n"
 						end
-						self:vertalign("VertAlign_Top"):settext(fulldesc):y(-6)
+						self:vertalign("VertAlign_Top"):settext(fulldesc):y(CREDIT_Y)
 					else
 						-- no credit information was specified in the simfile for this stepchart, so just set to an empty string
 						self:settext("")
@@ -252,7 +277,7 @@ return Def.ActorFrame{
 								end
 								fulldesc = fulldesc .. curText .. "\n"
 							end
-							self:vertalign("VertAlign_Top"):settext(fulldesc):y(-6)
+							self:vertalign("VertAlign_Top"):settext(fulldesc):y(CREDIT_Y)
 						else
 							-- no credit information was specified in the simfile for this stepchart, so just set to an empty string
 							self:settext("")

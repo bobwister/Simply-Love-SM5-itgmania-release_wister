@@ -1,12 +1,23 @@
 -- get the machine_profile now at file init; no need to keep fetching with each SetCommand
 local machine_profile = PROFILEMAN:GetMachineProfile()
 
+-- Solo: the pane is a card in the left column now, sitting directly above the difficulty
+-- picker, rather than a slab spanning half the screen just above the footer. It was the
+-- only thing left down there, and everything it reports is about the chart the column
+-- above it describes.
+--
+-- Two players still get the old arrangement -- one pane per half of the screen along the
+-- bottom -- because there is only one left column and they can't share it.
+local solo = (#GAMESTATE:GetHumanPlayers() == 1)
+
 -- the height of the footer is defined in ./Graphics/_footer.lua, but we'll
 -- use it here when calculating where to position the PaneDisplay
 local footer_height = 32
 
--- height of the PaneDisplay in pixels
-local pane_height = 60
+-- Size of the PaneDisplay. Solo takes both from Scripts/SL-Layout-SelectMusic.lua so the
+-- card lines up with the rest of the stack.
+local pane_width  = solo and SSM.column.w or (_screen.w/2 - 10)
+local pane_height = solo and SSM.cards.stats.h or 60
 
 local text_zoom = WideScale(0.58, 0.65)
 
@@ -288,10 +299,14 @@ end
 -- Every stat prints as "<value> <label>": the value is right-aligned ON its anchor and
 -- the label starts 3px after it. Values are bright, labels dim -- a dozen numbers in a
 -- 60px strip only reads if the words recede behind the figures.
-local pane_hw = (_screen.w/2 - 10) / 2
+local pane_hw = pane_width / 2
 
 local pos = {
-	row = { 13, 31, 49 },
+	-- TWEAK: the three text baselines, measured DOWN from the card's top edge -- the
+	-- background quad is vertalign(top), so the pane hangs below the frame origin. A Miso
+	-- line at 0.58 has an 8.7px visible band, and the top 2px of the card are the
+	-- difficulty rule.
+	row = solo and { 10, 25, 40 } or { 13, 31, 49 },
 
 	-- chart counts: two sub-columns over three rows
 	radar = { -0.72 * pane_hw, -0.355 * pane_hw },
@@ -371,7 +386,11 @@ af[#af+1] = RequestResponseActor(17, 50)..{
 		local master = self:GetParent()
 
 		if not IsServiceAllowed(SL.GrooveStats.GetScores) then
-			if SL.GrooveStats.IsConnected then
+			-- Only worth saying in "Pane" mode, where these two score rows ARE the
+			-- GrooveStats leaderboard. In the other modes the pane shows local
+			-- machine/profile bests and row 3 belongs to the technical counts and the
+			-- stream ratio, which "Disabled" would otherwise print straight on top of.
+			if SL.GrooveStats.IsConnected and show_rivals then
 				-- loadingText is made visible when requests complete.
 				-- If we disable the service from a previous request, surface it to the user here.
 				for i=1,2 do
@@ -446,6 +465,11 @@ for player in ivalues(PlayerNumber) do
 	af2.InitCommand=function(self)
 		self:visible(GAMESTATE:IsHumanPlayer(player))
 
+		if solo then
+			self:xy(SSM.column.cx, SSM.cards.stats.top)
+			return
+		end
+
 		if player == PLAYER_1 then
 			self:x(_screen.w * 0.25 - 5)
 		elseif player == PLAYER_2 then
@@ -492,7 +516,7 @@ for player in ivalues(PlayerNumber) do
 	af2[#af2+1] = Def.Quad{
 		Name="BackgroundQuad",
 		InitCommand=function(self)
-			self:zoomtowidth(_screen.w/2-10)
+			self:zoomtowidth(pane_width)
 			self:zoomtoheight(pane_height)
 			self:vertalign(top)
 			HUDPanel(self)
@@ -502,14 +526,14 @@ for player in ivalues(PlayerNumber) do
 	-- vertalign(top) above means the pane hangs below the frame origin, so the
 	-- bracket is offset by half its height to line up with it. Bottom-right only:
 	-- the DifficultyRule below already rules this card's whole top edge.
-	af2[#af2+1] = HUDCardDecor(_screen.w/2-10, pane_height, 0, pane_height/2, "br")
+	af2[#af2+1] = HUDCardDecor(pane_width, pane_height, 0, pane_height/2, "br")
 
 	-- The difficulty color now reads as a rule along the card's top edge rather
 	-- than flooding the whole pane, so the stats printed on it stay legible.
 	af2[#af2+1] = Def.Quad{
 		Name="DifficultyRule",
 		InitCommand=function(self)
-			self:zoomtowidth(_screen.w/2-10):zoomtoheight(2):vertalign(top)
+			self:zoomtowidth(pane_width):zoomtoheight(2):vertalign(top)
 		end,
 		SetCommand=function(self)
 			local SongOrCourse, StepsOrTrail = GetSongAndSteps(player)
