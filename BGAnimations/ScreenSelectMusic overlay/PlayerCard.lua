@@ -259,9 +259,13 @@ local peaks = Def.ActorFrame{
 		local index, count, event = CompositeRow()
 		if not index or not event then self:visible(false) return end
 
-		local best = SRPGProfileStats(player, event)
-		if not best then self:visible(false) return end
-
+		-- Shown with "--" when there is nothing to report, exactly like the rows either
+		-- side of it. Hiding it instead left a gap in the middle of a three-row block.
+		--
+		-- And it is deliberately NOT gated on there being a .rpg record: these two come
+		-- from the profile's own scores, so a season played before the theme kept rates
+		-- -- or on a machine that never wrote the file -- still has a level and a bpm to
+		-- show. Gating them on the rate file hid figures that existed.
 		local meter, bpm = SRPGPassedPeaks(player, event)
 
 		-- The separators live here rather than in the language files, which trim
