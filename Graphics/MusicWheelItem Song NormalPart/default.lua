@@ -14,7 +14,10 @@ local stepstype = GAMESTATE:GetCurrentStyle():GetStepsType()
 local IsNotWide = (GetScreenAspectRatio() < 16/9)
 
 -- Right-aligned data columns at the end of each row, reading left to right:
--- points, global ITL rank, EX score.
+-- points, global ITL rank, then a two-line stack of EX score over ITG score.
+--
+-- The bottom line of that stack (y=10) is the one level with points and rank, so
+-- it holds the ITG score -- the only one of the two that every row has.
 --
 -- The row plate spans 0 .. item_width from the frame origin, so anchoring to
 -- item_width puts the group hard against the row's right edge instead of
@@ -163,7 +166,7 @@ for player in ivalues(PlayerNumber) do
 				-- Solo: only the P1 actor draws, reading from whichever side
 				-- actually holds the profile. Both actors used to render the same
 				-- profile's score, one at y=-10 and one at y=10, so the number
-				-- appeared twice. One line, level with the points/rank columns.
+				-- appeared twice. One line only.
 				if player ~= PLAYER_1 then self:visible(false) return end
 
 				if PROFILEMAN:IsPersistentProfile(PLAYER_1) then
@@ -174,8 +177,11 @@ for player in ivalues(PlayerNumber) do
 					self:visible(false)
 					return
 				end
-				self:y(10)
+				self:y(0)
 			else
+				-- Versus keeps its own stacking: one line per player, and the ITG
+				-- score hides itself entirely (it early-outs on #humans ~= 1), so
+				-- there is no swap to make here.
 				self:visible(PROFILEMAN:IsPersistentProfile(player))
 				self:y(player == PLAYER_1 and -10 or 10)
 			end
@@ -270,8 +276,8 @@ end
 
 -- Global ITL points + global ITL rank, as a subtitle line reading (left to
 -- right) "points, rank, ITG score": same vertical level (y=10) and font size
--- (zoom 0.4) as the ITG/EX score at the end of the line (see the BitmapText
--- above, inside the per-player loop), positioned just to its left. Solo,
+-- (zoom 0.4) as the ITG score at the end of the line (the EX score sits one line
+-- above it, at y=0), positioned just to its left. Solo,
 -- persistent-profile player only. Points are color-coded by the song's LOCAL
 -- top-N standing (green = top75, yellow = top150, white otherwise); rank is
 -- the GLOBAL ITL leaderboard rank, fetched on demand (see
@@ -371,7 +377,7 @@ af[#af+1] = Def.BitmapText{
 	end,
 }
 
--- ITG score, sitting directly above the EX score in the same right-hand column.
+-- ITG score, sitting directly BELOW the EX score in the same right-hand column.
 -- Unlike points/rank/EX this is not ITL data: it is the profile's own best
 -- PercentDP on the row's chart, so it shows on every song, ITL pack or not.
 af[#af+1] = Def.BitmapText{
@@ -379,7 +385,7 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	Name="ITGScore",
 	InitCommand=function(self)
-		self:visible(false):horizalign(left):zoom(ITL_ZOOM):y(0)
+		self:visible(false):horizalign(left):zoom(ITL_ZOOM):y(10)
 		self:x( ITL_COL_EX )
 		self:diffuse(Color.White)
 	end,
