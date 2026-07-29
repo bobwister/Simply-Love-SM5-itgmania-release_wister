@@ -3,10 +3,6 @@ local player, controller = unpack(...)
 local pn = ToEnumShortString(player)
 local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(player)
 
--- H.EX (10ms) score marquee support (see the index==1 block below)
-local HEX_COLOR = color("#FF4FCB")
-local show10 = false -- false so the first frame is EX, not H.EX
-
 local TapNoteScores = {
 	Types = { 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'Miss' },
 	Colors = {
@@ -106,51 +102,27 @@ end
 
 -- then handle hands/ex, holds, mines, rolls
 for index, RCType in ipairs(RadarCategories.Types) do
-	-- Swap to displaying ITG score if we're showing EX score in gameplay.
+	-- The breakdown score is whatever the player chose as Secondary Score Display, and is
+	-- left out entirely when that is None. No EX <-> H. EX marquee any more; see
+	-- Scripts/SL-Helpers-ScoreDisplay.lua for the mapping and the reasoning.
 	if index == 1 then
-		local score_percent, score_diffuse
-		local ex_percent, hex_percent, marquee
+		local score_type    = ScoreDisplayType(player, "secondary")
+		local score_percent = ScoreDisplayPercent(player, score_type, counts)
 
-		if SL[pn].ActiveModifiers.ShowEXScore then
-			-- EX is the big score (Percentage.lua); show ITG% here.
-			local PercentDP = pss:GetPercentDancePoints()
-			-- note: gsub returns (string, count); assign to a local first so
-			-- tonumber() doesn't receive the count as its (out-of-range) base arg
-			local PercentStr = FormatPercentScore(PercentDP):gsub("%%", "")
-			score_percent = tonumber(PercentStr)
-			score_diffuse = Color.White
-		else
-			-- EX is the breakdown score; support EX <-> H.EX marquee when SmallerWhite is on.
-			ex_percent  = CalculateExScore(player, counts)
-			hex_percent = CalculateSuperExScore(player, counts)
-			score_percent = ex_percent
-			score_diffuse = SL.JudgmentColors[SL.Global.GameMode][1]
-			marquee = SL[pn].ActiveModifiers.SmallerWhite or false
+		-- nil means None. The radar rows below place themselves off `index`, not off this
+		-- actor, so omitting it leaves no gap in the list.
+		if score_percent then
+			t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
+				Name="Percent",
+				Text=("%.2f"):format(score_percent),
+				InitCommand=function(self)
+					self:horizalign(right):zoom(1.3)
+					self:x( ((controller == PLAYER_1) and -114) or 286 )
+					self:y(47)
+					self:diffuse( ScoreDisplayColor(score_type) )
+				end,
+			}
 		end
-
-		t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Bold")..{
-			Name="Percent",
-			Text=("%.2f"):format(score_percent),
-			InitCommand=function(self)
-				self:horizalign(right):zoom(1.3)
-				self:x( ((controller == PLAYER_1) and -114) or 286 )
-				self:y(47)
-				self:diffuse(score_diffuse)
-			end,
-			BeginCommand=function(self)
-				if marquee then self:playcommand("Marquee") end
-			end,
-			MarqueeCommand=function(self)
-				if show10 then
-					self:settext(("%.2f"):format(hex_percent)):diffuse(HEX_COLOR)
-					show10 = false
-				else
-					self:settext(("%.2f"):format(ex_percent)):diffuse(score_diffuse)
-					show10 = true
-				end
-				self:sleep(2):queuecommand("Marquee")
-			end,
-		}
 	end
 
 	local possible = counts["total"..RCType]

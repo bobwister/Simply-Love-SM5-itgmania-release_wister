@@ -2,34 +2,35 @@ local player, controller = unpack(...)
 local pn = ToEnumShortString(player)
 local mods = SL[pn].ActiveModifiers
 
-local HEX_COLOR = color("#FF4FCB")
-local show10 = false       -- toggle state for the score number marquee; false so the first frame is EX, not H.EX
-local show10_label = false -- toggle state for the score type label marquee; false so the first frame is EX, not H.EX
+-- The big score is whatever the player chose as Primary Score Display, full stop. There is
+-- no EX <-> H. EX marquee any more; see Scripts/SL-Helpers-ScoreDisplay.lua for the mapping
+-- and for why the alternation was removed.
+local counts      = GetExJudgmentCounts(player)
+local score_type  = ScoreDisplayType(player, "primary")
+local percent     = ScoreDisplayPercent(player, score_type, counts) or 0
+local diffuse     = ScoreDisplayColor(score_type)
+local score_label = ScoreDisplayLabel(score_type)
 
-local percent = nil
-local diffuse = nil
--- when EX is the displayed score, precompute both EX and H.EX for the SmallerWhite marquee
-local ex_percent, hex_percent
-local marquee = false
+-- Layout of the pair. Both are right-aligned: the type label ends at LABEL_X, the number
+-- ends at NUMBER_X and grows leftwards into the gap between them.
+-- TWEAK: these two anchors are the horizontal position of the label and of the number.
+local LABEL_X  = (controller == PLAYER_1) and -95 or 45
+local NUMBER_X = (controller == PLAYER_1) and 1.5 or 141
+local NUMBER_ZOOM = 0.8 * 1.3 * 1.1
+local LABEL_GAP = 6
 
-if mods.ShowEXScore then
-	local counts = GetExJudgmentCounts(player)
-	ex_percent  = CalculateExScore(player, counts)
-	hex_percent = CalculateSuperExScore(player, counts)
-	percent = ex_percent
-	diffuse = SL.JudgmentColors[SL.Global.GameMode][1]
-	marquee = mods.SmallerWhite or false
-else
-	local stats = STATSMAN:GetCurStageStats():GetPlayerStageStats(player)
-	local PercentDP = stats:GetPercentDancePoints()
-	percent = FormatPercentScore(PercentDP):gsub("%%", "")
-	-- Format the Percentage string, removing the % symbol
-	percent = tonumber(percent)
-	diffuse = Color.White
-end
-
--- text label shown to the LEFT of the big score, matching its type/color
-local score_label = mods.ShowEXScore and "EX" or "ITG"
+-- The number is capped so it can never run back over its own label.
+--
+-- It has to be capped rather than merely sized to fit: in _eurostile outline (which
+-- "Common Bold" redirects to) a digit advances 19 units and the point 10, so "100.00" is
+-- ~105 units = ~120px at this zoom, against the ~96px between the two anchors. A maxed ITG
+-- score therefore printed straight through the "ITG" beside it, while a typical two-digit
+-- EX score fit and hid the problem -- which is exactly why this only showed up with ITG as
+-- the primary score.
+--
+-- maxwidth caps the UNZOOMED width, hence the division: on-screen width is
+-- min(rawWidth, maxWidth) * zoom.
+local NUMBER_MAXWIDTH = (NUMBER_X - LABEL_X - LABEL_GAP) / NUMBER_ZOOM
 
 return Def.ActorFrame{
 	Name="PercentageContainer"..ToEnumShortString(player),
@@ -61,22 +62,8 @@ return Def.ActorFrame{
 		Text=score_label,
 		InitCommand=function(self)
 			self:horizalign(right):zoom(0.5)
-			-- TWEAK: horizontal position of the type label, to the left of the big number
-			self:x( controller == PLAYER_1 and -95 or 45 )
+			self:x( LABEL_X )
 			self:diffuse(diffuse)
-		end,
-		BeginCommand=function(self)
-			if marquee then self:playcommand("Marquee") end
-		end,
-		MarqueeCommand=function(self)
-			if show10_label then
-				self:settext("H. EX"):diffuse(HEX_COLOR)
-				show10_label = false
-			else
-				self:settext("EX"):diffuse(diffuse)
-				show10_label = true
-			end
-			self:sleep(2):queuecommand("Marquee")
 		end,
 	},
 
@@ -84,25 +71,12 @@ return Def.ActorFrame{
 		Name="Percent",
 		Text=("%.2f"):format(percent),
 		InitCommand=function(self)
-			-- Match the secondary score's effective size (JudgmentNumbers.lua: zoom 1.3
-			-- inside its own 0.8-zoom parent frame = 1.04), + 10%, so this doesn't
-			-- overlap the "ITG"/"EX" label to its left.
-			self:horizalign(right):zoom(0.8 * 1.3 * 1.1)
-			self:x( (controller == PLAYER_1 and 1.5 or 141))
+			-- Matches the secondary score's effective size (JudgmentNumbers.lua: zoom 1.3
+			-- inside its own 0.8-zoom parent frame = 1.04), + 10%.
+			self:horizalign(right):zoom(NUMBER_ZOOM)
+			self:x( NUMBER_X )
+			self:maxwidth( NUMBER_MAXWIDTH )
 			self:diffuse(diffuse)
-		end,
-		BeginCommand=function(self)
-			if marquee then self:playcommand("Marquee") end
-		end,
-		MarqueeCommand=function(self)
-			if show10 then
-				self:settext(("%.2f"):format(hex_percent)):diffuse(HEX_COLOR)
-				show10 = false
-			else
-				self:settext(("%.2f"):format(ex_percent)):diffuse(diffuse)
-				show10 = true
-			end
-			self:sleep(2):queuecommand("Marquee")
 		end,
 	}
 }

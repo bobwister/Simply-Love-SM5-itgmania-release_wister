@@ -3,10 +3,6 @@ local player, controller = unpack(...)
 local pn = ToEnumShortString(player)
 local stats = STATSMAN:GetCurStageStats():GetPlayerStageStats(pn)
 
--- H.EX (10ms) label marquee support (see the index==1 block below)
-local HEX_COLOR = color("#FF4FCB")
-local show10 = false -- false so the first frame is EX, not H.EX
-
 local firstToUpper = function(str)
     return (str:gsub("^%l", string.upper))
 end
@@ -131,39 +127,25 @@ end
 
 -- labels: hands/ex, holds, mines, rolls
 for index, label in ipairs(RadarCategories) do
+	-- Labels the breakdown score, so it names whatever Secondary Score Display asked for and
+	-- disappears with it when that is None. Kept in step with the number in
+	-- JudgmentNumbers.lua through the same helper, so the two cannot drift apart.
 	if index == 1 then
-		local text, label_diffuse, marquee
-		if SL[pn].ActiveModifiers.ShowEXScore then
-			text = "ITG"
-			label_diffuse = Color.White
-		else
-			text = "EX"
-			label_diffuse = SL.JudgmentColors[SL.Global.GameMode][1]
-			marquee = SL[pn].ActiveModifiers.SmallerWhite or false
-		end
+		local score_type = ScoreDisplayType(player, "secondary")
 
-		t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small"
-							or ThemePrefs.Get("ThemeFont") == "Mega" and "Mega/_mega font"
-							or ThemePrefs.Get("ThemeFont") == "Unprofessional" and "Unprofessional/_unprofessional small")..{
-			Text=text,
-			InitCommand=function(self) self:zoom(0.5):horizalign(right) end,
-			BeginCommand=function(self)
-				self:x( (controller == PLAYER_1 and -145) or 95 )
-				self:y(38)
-				self:diffuse(label_diffuse)
-				if marquee then self:playcommand("Marquee") end
-			end,
-			MarqueeCommand=function(self)
-				if show10 then
-					self:settext("H. EX"):diffuse(HEX_COLOR)
-					show10 = false
-				else
-					self:settext("EX"):diffuse(label_diffuse)
-					show10 = true
-				end
-				self:sleep(2):queuecommand("Marquee")
-			end
-		}
+		if score_type ~= "None" then
+			t[#t+1] = LoadFont(ThemePrefs.Get("ThemeFont") == "Common" and "Wendy/_wendy small"
+								or ThemePrefs.Get("ThemeFont") == "Mega" and "Mega/_mega font"
+								or ThemePrefs.Get("ThemeFont") == "Unprofessional" and "Unprofessional/_unprofessional small")..{
+				Text=ScoreDisplayLabel(score_type),
+				InitCommand=function(self) self:zoom(0.5):horizalign(right) end,
+				BeginCommand=function(self)
+					self:x( (controller == PLAYER_1 and -145) or 95 )
+					self:y(38)
+					self:diffuse( ScoreDisplayColor(score_type) )
+				end,
+			}
+		end
 	end
 
 	local performance = stats:GetRadarActual():GetValue( "RadarCategory_"..firstToUpper(EnglishRadarCategories[label]) )
