@@ -15,7 +15,13 @@
 -- -----------------------------------------------------------------------
 -- Which event a pack belongs to.
 --
--- Returns the event number as a string ("8", "10"), or nil for a pack that isn't SRPG.
+-- Returns the event number as a string, or nil for a pack that isn't SRPG.
+--
+-- Ten seasons exist (Stamina RPG 1 through 10), so the number is one OR two digits and
+-- nothing here may assume its width -- see the numeric comparison in SRPGCurrentEvent,
+-- which is where that actually bites. "%d+" covers both, and a season's unlock pack
+-- resolves to the same number as its main pack, which is what GroupsForEvent wants.
+--
 -- Both spellings are accepted because packs and the API disagree: the song folders are
 -- named "Stamina RPG 8" while the API calls the event "SRPG8".
 SRPGEventFromGroupName = function(groupName)
@@ -61,25 +67,48 @@ SRPGInvalidate = function()
 	peaks_cache = {}
 end
 
+-- Opening for reading is the existence check, deliberately: there is NO
+-- FILEMAN:DoesFileExist here, and putting one back breaks this file.
+--
+-- RageFile does a "safe write". SRPGRecordRate's Open(path, 2) actually writes
+-- "new.SRPG10.rpg.new", and Close() renames that over the real name with the raw
+-- platform call -- WinMoveFile on Windows, rename() elsewhere
+-- (RageFileDriverDirect.cpp:352). It does NOT go through the driver's Move(), which is
+-- the one and only place that calls FDB->AddFile (RageFileDriverDirect.cpp:156). So the
+-- FilenameDB is never told the file appeared.
+--
+-- DoesFileExist is answered entirely out of that DB -- DoesFileExist -> GetFileType ->
+-- FDB->GetFileType (RageFileManager.cpp:1186, RageFileDriver.cpp:56) -- and the listing
+-- for the profile directory was cached when the profile loaded, before the file existed.
+-- So it answers false for a file that is sitting on disk, and keeps answering false for
+-- the rest of the session.
+--
+-- Open() has no such problem: OpenForReading asks each driver directly with no existence
+-- gate (RageFileManager.cpp:1064), and RageFileDriverDirect::Open ignores what
+-- ResolvePath thinks and calls the real open (RageFileDriverDirect.cpp:120). It returns
+-- false when the file genuinely is not there, which is the whole of what this needs.
+--
+-- This bit only this reader, out of the two dozen DoesFileExist calls in the theme,
+-- because it is the only one that reads back a file the same session wrote: ITL keeps its
+-- data in SL[pn].ITLData and never re-reads itl2024.json, and every other call is looking
+-- at a banner or an avatar that shipped with the pack.
 local function Load(path)
 	local hit = cache[path]
 	if hit then return hit end
 
 	local rates = {}
 
-	if FILEMAN:DoesFileExist(path) then
-		local f = RageFileUtil:CreateRageFile()
-		if f:Open(path, 1) then
-			local contents = f:Read()
-			f:Close()
-			-- one line per song, "<key>=<rate>"; anything else is skipped rather than
-			-- guessed at
-			for key, rate in contents:gmatch("([^\r\n=]+)=([%d%.]+)") do
-				rates[key] = tonumber(rate)
-			end
+	local f = RageFileUtil:CreateRageFile()
+	if f:Open(path, 1) then
+		local contents = f:Read()
+		f:Close()
+		-- one line per song, "<key>=<rate>"; anything else is skipped rather than
+		-- guessed at
+		for key, rate in contents:gmatch("([^\r\n=]+)=([%d%.]+)") do
+			rates[key] = tonumber(rate)
 		end
-		f:destroy()
 	end
+	f:destroy()
 
 	cache[path] = rates
 	return rates
@@ -97,7 +126,9 @@ SRPGCurrentEvent = function()
 	local newest = nil
 	for group in ivalues(SONGMAN:GetSongGroupNames() or {}) do
 		local n = SRPGEventFromGroupName(group)
-		-- compared as numbers: "10" sorts before "8" as a string
+		-- Compared as NUMBERS, not as strings. With seasons 1..9 also installed this is
+		-- the difference between the right answer and the wrong one: sorted as strings,
+		-- "9" beats "10", so the panel would pin itself to season 9 forever.
 		if n and (newest == nil or tonumber(n) > tonumber(newest)) then newest = n end
 	end
 
