@@ -112,8 +112,18 @@ local function CurrentPackName()
 	local song = GAMESTATE:GetCurrentSong()
 	if song then return song:GetGroupName() end
 
+	-- The method is checked for, not just the screen. A nil check alone is not enough:
+	-- "switch profile" from the wheel PUSHES ScreenSelectProfile on top of
+	-- ScreenSelectMusic, so the top screen here can perfectly well be a screen that has no
+	-- MusicWheel at all -- and calling GetMusicWheel on one throws
+	-- "attempt to call method 'GetMusicWheel' (a nil value)".
+	--
+	-- Which is reachable: switch profile, escape out of it without picking one, press
+	-- Enter. A Refresh lands while that screen is still on top and the whole command
+	-- aborts, leaving the rail on stale text. Indexing a missing method on an engine
+	-- object returns nil rather than throwing, so this guard is safe.
 	local screen = SCREENMAN:GetTopScreen()
-	if screen then
+	if screen and screen.GetMusicWheel then
 		local wheel = screen:GetMusicWheel()
 		if wheel then return wheel:GetSelectedSection() end
 	end
@@ -189,8 +199,13 @@ end
 
 -- Move `offset` packs from wherever we are and select that pack's first song.
 local function JumpToPack(offset)
+	-- Same method check as CurrentPackName, for the same reason. Defensive rather than a
+	-- fix: this one runs from an input callback, and input belongs to whichever screen is
+	-- on top, so it should not fire while ScreenSelectProfile is up. Guarded anyway so the
+	-- two readers of the wheel in this file cannot drift apart -- and because the failure
+	-- mode is a hard error, not a wrong number.
 	local screen = SCREENMAN:GetTopScreen()
-	if not screen then return end
+	if not screen or not screen.GetMusicWheel then return end
 
 	local wheel = screen:GetMusicWheel()
 	if not wheel then return end
