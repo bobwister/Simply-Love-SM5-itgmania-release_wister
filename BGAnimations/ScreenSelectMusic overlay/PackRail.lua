@@ -22,6 +22,23 @@
 -- rail simply renders blank.
 local packs = SONGMAN:GetSongGroupNames() or {}
 
+-- How many songs each pack holds, worked out once here rather than per Refresh.
+--
+-- Refresh runs on every CurrentSongChanged, i.e. every cran of scroll, and
+-- SONGMAN:GetSongsInGroup builds a fresh Lua table of the whole pack each call -- 199
+-- entries for ITL Online 2025 Unlocks. Counting all packs once at file scope is the same
+-- idiom SongDescription/GroupDurations.lua uses, and strictly cheaper than what that file
+-- already does (it sums MusicLengthSeconds over every song).
+--
+-- This number is the one the wheel's group rows used to print at their right edge. That
+-- slot now carries clear progress instead (Graphics/MusicWheelItem GroupProgress.lua), so
+-- the plain song count moves here, where there is room for it and where it belongs with
+-- the rest of "which pack am I in".
+local pack_song_counts = {}
+for _, name in ipairs(packs) do
+	pack_song_counts[name] = #(SONGMAN:GetSongsInGroup(name) or {})
+end
+
 local accent = PlayerColor(PLAYER_1)
 -- TWEAK: rail text brightness. These sat well against the old see-through header
 -- but read as muddy on the opaque band, so they are pitched brighter here: the
@@ -52,6 +69,7 @@ local LEGEND_Y      = 9
 local LEGEND_ZOOM   = 0.26
 local LEGEND_PREV   = Screen.String("PackRailPrev")
 local LEGEND_NEXT   = Screen.String("PackRailNext")
+local LEGEND_SONGS  = Screen.String("PackRailSongs")
 
 -- Which pack the wheel is sitting in. Prefer the current song's group, which is
 -- correct whatever the sort order; fall back to the wheel's own section name for
@@ -364,6 +382,23 @@ local af = Def.ActorFrame{
 			self:settext(params and params.counter or "")
 		end
 	},
+
+	-- How many songs the current pack holds, stacked under the pack counter on the same
+	-- right anchor. It sits on the legend row so it lines up with the CTRL+LEFT/RIGHT
+	-- hints either side, and so it stays clear of the neighbour pack names on the row
+	-- above.
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Name="SongCount",
+		InitCommand=function(self)
+			self:horizalign(right):zoom(LEGEND_ZOOM):xy(COUNTER_X, LEGEND_Y)
+			self:diffuse(quiet)
+		end,
+		SetRailCommand=function(self, params)
+			local n = params and params.songs
+			-- blank rather than "0 SONGS" when the rail has no pack to describe
+			self:settext( n and (n .. " " .. LEGEND_SONGS) or "" )
+		end
+	},
 }
 
 -- One place computes the strings, then hands them to every child, so the five
@@ -372,7 +407,7 @@ af.RefreshCommand=function(self)
 	local index = IndexOfPack(CurrentPackName())
 
 	if not index then
-		self:playcommand("SetRail", { prev="", current="", next="", counter="" })
+		self:playcommand("SetRail", { prev="", current="", next="", counter="", songs=nil })
 		return
 	end
 
@@ -384,6 +419,7 @@ af.RefreshCommand=function(self)
 		current = packs[index],
 		next    = #packs > 1 and packs[next_i] or "",
 		counter = ("%d/%d"):format(index, #packs),
+		songs   = pack_song_counts[ packs[index] ],
 	})
 end
 

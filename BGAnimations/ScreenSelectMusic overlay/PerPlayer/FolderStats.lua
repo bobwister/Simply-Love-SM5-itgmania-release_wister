@@ -1,288 +1,236 @@
--- No folders in course mode to get stats
+-- Folder stats: how far into the current pack this profile is, at the difficulty the
+-- wheel is on.
+--
+-- A floating card over the right of the screen, shown while the wheel is sorted by group.
+-- It answers what a wheel row cannot: a row is 32px tall and the engine will not let a
+-- group row be any taller than a song row -- WheelBase hands ItemTransformFunction a
+-- throwaway Actor and caches the result on (offset, index) alone, so row height cannot
+-- depend on what a row contains. The star tally needs more than one line, so it needs a
+-- card.
+--
+-- It reads the same cached walk the wheel's group rows read
+-- (Scripts/SL-Helpers-FolderProgress.lua). This file used to run its own, uncached,
+-- identical pass over every song in the group, with a hand-rolled
+-- currentFolder/currentDifficulty memo of its own -- two walks of a 199-song pack where
+-- one does.
+
+-- No folders in course mode to get stats for
 if GAMESTATE:IsCourseMode() then return end
 
--- Don't show folder stats if disabled in operator menu
+-- Don't show folder stats if disabled in the operator menu
 if not ThemePrefs.Get("FolderStats") then return end
 
 local player = ...
 local pn = ToEnumShortString(player)
 
-local IsNotWide = (GetScreenAspectRatio() < 16/9)
+local accent = PlayerColor(player)
 
-local currentFolder = ""
-local currentDifficulty = ""	
+-- TWEAK: the card.
+--
+-- WIDTH is held to roughly what this panel already occupied, because two of them tile
+-- side by side in versus (see the x positions below) and 4:3 has no room for anything
+-- wider. That is also why the star tally stacks its count UNDER its icon rather than
+-- beside it: a 26px cell fits a 14px icon over a three-digit count, but not the two in a
+-- row.
+local W = WideScale(146, 188)
+local H = 74
+local PAD = 8
+
+-- Everything vertical is measured DOWN from the card's top edge, which is this frame's
+-- origin -- same convention as PlayerCard.lua.
+local NAME_Y  = 12
+local ROW_Y   = 30
+local RULE_Y  = 40
+local ICON_Y  = 52
+local COUNT_Y = 65
+
+local NAME_ZOOM  = 0.50
+local LABEL_ZOOM = 0.38
+local VALUE_ZOOM = 0.50
+local COUNT_ZOOM = 0.38
+
+local CELL_W    = (W - 2*PAD) / 5
+local ICON_SIZE = 14
+
+local GRADE_SHEET = THEME:GetPathG("MusicWheelItem", "Grades/grades 1x18.png")
+local QUINT_ICON  = THEME:GetPathG("MusicWheelItem", "Grades/quint.png")
+
+-- Where the card sits. Solo hugs the right edge; versus tiles two of them leftward.
+-- These are the positions this panel already used, kept so a versus cabinet doesn't have
+-- its layout moved out from under it.
+local SOLO_X   = _screen.cx * 1.77
+local VERSUS_X = _screen.cx * 1.305
+local CARD_TOP = _screen.cy * 0.3 - H/2
+
+local function CardX()
+	if #GAMESTATE:GetHumanPlayers() > 1 and player == PLAYER_1 then return VERSUS_X end
+	return SOLO_X
+end
+
+-- Centre of star cell `i`, i = 1 for quints down to 5 for one star, reading left to right
+-- best first -- the same order the player card's tally uses.
+local function CellX(i)
+	return -W/2 + PAD + (i - 1) * CELL_W + CELL_W/2
+end
+
+-- -----------------------------------------------------------------------
 
 local af = Def.ActorFrame{
+	Name="FolderStats",
 	InitCommand=function(self)
-		self:y(_screen.cy*0.3)
-		if #GAMESTATE:GetHumanPlayers() > 1 and player == PLAYER_1 then 
-			self:x(_screen.cx*1.305)
-		else
-			self:x(_screen.cx*1.77)
-		end
+		self:xy(CardX(), CARD_TOP)
 	end,
-	CurrentSongChangedMessageCommand=function(self)
-		self:queuecommand("BuildSongLampArray")
-	end,
-	["CurrentSteps"..pn.."ChangedMessageCommand"]=function(self)
-		self:queuecommand("BuildSongLampArray")
-	end,
+
+	OnCommand=function(self)                            self:playcommand("Refresh") end,
+	CurrentSongChangedMessageCommand=function(self)     self:playcommand("Refresh") end,
+	["CurrentSteps"..pn.."ChangedMessageCommand"]=function(self) self:playcommand("Refresh") end,
+	MusicWheelSortMessageCommand=function(self)         self:playcommand("Refresh") end,
+	PlayerProfileSetMessageCommand=function(self)       self:playcommand("Refresh") end,
+
 	PlayerJoinedMessageCommand=function(self, params)
-		if #GAMESTATE:GetHumanPlayers() > 1 and player == PLAYER_1 then 
-			self:x(_screen.cx*1.305)
-		else
-			self:x(_screen.cx*1.77)
-		end
-		if params.Player == player then
-			self:visible(true)
-		end
+		self:x(CardX())
+		if params.Player == player then self:playcommand("Refresh") end
 	end,
 	PlayerUnjoinedMessageCommand=function(self, params)
-		self:x(_screen.cx*1.77)
-		if params.Player == player then
+		self:x(CardX())
+		if params.Player == player then self:playcommand("Refresh") end
+	end,
+
+	-- One place decides whether the card has anything to say, then hands the figures to
+	-- every child. The children never look the pack up themselves.
+	RefreshCommand=function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen or screen:GetName() ~= "ScreenSelectMusic" then
 			self:visible(false)
+			return
 		end
-	end
-}
 
-local num_tiers = THEME:GetMetric("PlayerStageStats", "NumGradeTiersUsed")
-local grades = {}
-for i=1,num_tiers do
-	grades[ ("Grade_Tier%02d"):format(i) ] = i-1
-end
-
--- assign the "Grade_Failed" key a value equal to num_tiers
-grades["Grade_Failed"] = num_tiers
-
-difficultyNames = {
-	Difficulty_Beginner = "Beginner",
-	Difficulty_Easy = "Easy",
-	Difficulty_Medium = "Medium",
-	Difficulty_Hard = "Hard",
-	Difficulty_Challenge = "Expert",
-	Difficulty_Edit = "Edit"
-
-}
-
-af2 = Def.ActorFrame {
-	InitCommand=function(self)
-		self:zoom(0.45)
-	end
-}
-
-af2.BuildSongLampArrayCommand=function(self)
-	if SCREENMAN:GetTopScreen():GetName() == "ScreenSelectMusic" then
-		local profile = PROFILEMAN:GetProfile(player)
-		local profileName = profile:GetDisplayName()
-		if (not GAMESTATE:IsPlayerEnabled(player)) or profileName == "" or GAMESTATE:GetSortOrder() ~= 'SortOrder_Group' then 
+		-- Outside a group sort the wheel's "section" is a letter or a BPM band, not a
+		-- pack, and none of this means anything.
+		if not GAMESTATE:IsPlayerEnabled(player)
+				or GAMESTATE:GetSortOrder() ~= "SortOrder_Group" then
 			self:visible(false)
-		else
-			self:visible(true)
-			local scores = {
-				Grade_Tier00 = 0,
-				Grade_Tier01 = 0,
-				Grade_Tier02 = 0,
-				Grade_Tier03 = 0,
-				Grade_Tier04 = 0,
-				Passes = 0
-			}
-			local countSongs = 0
-			local folderName = SCREENMAN:GetTopScreen():GetMusicWheel():GetSelectedSection()
-			local songs = SONGMAN:GetSongsInGroup(folderName)
-			local stepstype = GAMESTATE:GetCurrentStyle():GetStepsType()
-			local steps = GAMESTATE:GetCurrentSteps(player)
-			if steps then
-				local difficulty = steps:GetDifficulty()
-				-- Get profile and current difficulty
-				if folderName ~= currentFolder or difficulty ~= currentDifficulty then
-					currentFolder = folderName
-					currentDifficulty = difficulty
-					for song in ivalues(songs) do
-						local allsteps = song:GetAllSteps()
-						for songsteps in ivalues(allsteps) do
-							local stepsdiff = songsteps:GetDifficulty()
-							if difficulty == stepsdiff and stepstype == songsteps:GetStepsType() then
-								countSongs = countSongs + 1
-								HighScoreList = profile:GetHighScoreListIfExists(song,songsteps)
-								if HighScoreList ~= nil then 
-									HighScores = HighScoreList:GetHighScores()
-									-- Get highest score
-									if #HighScores > 0 then
-										local grade = HighScores[1]:GetGrade()
-										if grade ~= "Grade_Failed" then
-											scores["Passes"] = scores["Passes"] + 1
-											if grades[grade] < 4 then
-												if grade == "Grade_Tier01" and HighScores[1]:GetScore() == 0 then
-													scores["Grade_Tier00"] = scores["Grade_Tier00"] + 1
-												else
-													scores[grade] = scores[grade] + 1
-												end
-											end
-										end
-									end
-								end
-							end
-						end
-					end
-					self:playcommand("FolderSummary", {folderName=folderName, profileName=profileName, countSongs=countSongs, scores=scores, difficulty=difficulty })
-				end
-			else
-				self:visible(false)
+			return
+		end
+
+		local wheel = screen:GetMusicWheel()
+		local group = wheel and wheel:GetSelectedSection()
+		if not group or group == "" then
+			self:visible(false)
+			return
+		end
+
+		local cleared, total, tiers = FolderProgressGet(player, group)
+		-- nil = no profile or no chart selected; 0 = a section that holds no charts at
+		-- this difficulty, which there is nothing useful to say about
+		if not total or total == 0 then
+			self:visible(false)
+			return
+		end
+
+		local steps = GAMESTATE:GetCurrentSteps(player)
+
+		self:visible(true)
+		self:playcommand("SetFolder", {
+			group      = group,
+			cleared    = cleared,
+			total      = total,
+			tiers      = tiers,
+			difficulty = steps:GetDifficulty(),
+		})
+	end,
+
+	Def.Quad{
+		InitCommand=function(self)
+			HUDPanel(self):zoomto(W, H):vertalign(top)
+		end
+	},
+}
+
+af[#af+1] = HUDCardDecor(W, H, 0, H/2)
+
+-- The pack's name, in the player's accent so the card reads as belonging to them.
+af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+	Name="FolderName",
+	Text="",
+	InitCommand=function(self)
+		self:y(NAME_Y):zoom(NAME_ZOOM):maxwidth((W - 2*PAD) / NAME_ZOOM)
+		self:diffuse(accent)
+	end,
+	SetFolderCommand=function(self, params) self:settext(params.group) end
+}
+
+-- Which difficulty is being counted, left, and the clear progress, right. The difficulty
+-- has to be named here: unlike the wheel row, this card is read on its own.
+af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+	Name="Difficulty",
+	Text="",
+	InitCommand=function(self)
+		self:horizalign(left):xy(-W/2 + PAD, ROW_Y):zoom(LABEL_ZOOM)
+		self:maxwidth((W - 2*PAD - 44) / LABEL_ZOOM):diffuse(HUD_LABEL)
+	end,
+	SetFolderCommand=function(self, params)
+		self:settext( THEME:GetString("Difficulty", ToEnumShortString(params.difficulty)):upper() )
+	end
+}
+
+af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+	Name="Progress",
+	Text="",
+	InitCommand=function(self)
+		self:horizalign(right):xy(W/2 - PAD, ROW_Y):zoom(VALUE_ZOOM):diffuse(HUD_TEXT)
+	end,
+	SetFolderCommand=function(self, params)
+		self:settext( params.cleared .. "/" .. params.total )
+	end
+}
+
+af[#af+1] = Def.Quad{
+	InitCommand=function(self)
+		self:zoomto(W - 2*PAD, 1):y(RULE_Y)
+		self:diffuse( DimColor(accent, 1.0, 0.20) )
+	end
+}
+
+-- The tally: five tiers, best first, icon over count.
+--
+-- The icons are the wheel's own -- the star tiers off the grade sheet, quint.png for the
+-- fifth -- exactly as the player card draws them, so a pack's tally and a profile's tally
+-- say the same thing with the same pictures.
+for tier = 5, 1, -1 do
+	local cell_x = CellX(6 - tier)
+
+	if tier == 5 then
+		af[#af+1] = Def.Sprite{
+			Texture=QUINT_ICON,
+			InitCommand=function(self)
+				self:zoomto(ICON_SIZE, ICON_SIZE):xy(cell_x, ICON_Y)
 			end
-		end
+		}
+	else
+		af[#af+1] = Def.Sprite{
+			Texture=GRADE_SHEET,
+			InitCommand=function(self)
+				-- state 0 is Grade_Tier01, the four-star grade, so a 4-star tier is state 0
+				self:animate(false):setstate(4 - tier)
+				self:zoomto(ICON_SIZE, ICON_SIZE):xy(cell_x, ICON_Y)
+			end
+		}
 	end
-end
 
--- Banner size
-local height = IsNotWide and 314 or 418
-local width = IsNotWide and 123 or 164
-
-local style = ThemePrefs.Get("VisualStyle")
-local colorTable = (style == "SRPG6") and SL.SRPG6.Colors or SL.DecorativeColors
-
--- Border Quad
-af2[#af2+1] = Def.Quad {
-	InitCommand=function(self)
-		self:zoomto(height+2,width+2)
-		self:diffuse(color(colorTable[SL.Global.ActiveColorIndex]))
-	end
-}
-
--- Background Quad, this is used for transparent backgrounds like Bangers Only 1
-af2[#af2+1] = Def.Quad {
-	InitCommand=function(self)
-		self:zoomto(height,width):diffuse(Color.Black)
-	end
-}
-
--- Banner
-af2[#af2+1] = Def.Banner{
-	FolderSummaryCommand=function(self, params)
-		self:LoadFromSongGroup(params.folderName)
-		self:setsize(height,width)
-	end
-}
-
--- Transparent quad over the banner
-af2[#af2+1] = Def.Quad {
-	InitCommand=function(self)
-		self:zoomto(height,width):diffuse(Color.Black):diffusealpha(0.8)
-	end
-}
-
--- Folder name
-af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	Name="Folder",
-	Text="",
-	FolderSummaryCommand=function(self,params)
-		self:settext(params.folderName)
-		self:y(-60)
-		self:zoom(2)
-		self:maxwidth(200)
-		
-		if IsNotWide then
-			self:zoom(1.5)
-			self:y(-50)
-		end
-	end
-}
-
--- Profile name
-af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	Name="ProfileName",
-	Text="",
-	FolderSummaryCommand=function(self,params)
-		self:settext(params.profileName)
-		self:y(-20)
-		self:zoom(2)
-		self:maxwidth(200)
-		if IsNotWide then
-			self:zoom(1.5)
-		end
-	end
-}
-
--- Total Song Count
-af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	Name="TotalSongs",
-	Text="",
-	FolderSummaryCommand=function(self,params)
-		local text = "Total " .. difficultyNames[params.difficulty] .. ": " .. params.scores["Passes"] .. "/" .. params.countSongs
-		self:settext(text)
-		self:y(15)
-		self:zoom(1.25)
-		if IsNotWide then
-			self:zoom(0.94)
-		end
-	end
-}
-
--- Grades and grade count
-local columnWidth = IsNotWide and 62 or 80
-af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-	Name="Grade0",
-	Text="",
-	FolderSummaryCommand=function(self,params)
-		local text = params.scores["Grade_Tier00"]
-		self:settext(text)
-		self:x(-210+columnWidth)
-		self:y(52)
-		self:zoom(1.4)
-		if IsNotWide then
-			self:zoom(1.05)
-			self:x(-170+columnWidth)
-			self:y(45)
-		end
-	end
-}
-af2[#af2+1] = Def.Sprite{
-	Texture=THEME:GetPathG("MusicWheelItem","Grades/quint.png"),
-	InitCommand=function(self) self:zoom( SL_WideScale(0.18, 0.3) ):animate(false) end,
-	FolderSummaryCommand=function(self, params)
-		self:x(-250+columnWidth)
-		self:y(52)
-		self:zoom(0.5)
-		if IsNotWide then
-			self:zoom(0.38)
-			self:x(-200+columnWidth)
-			self:y(45)
-		end
-	end
-}
-for i=1,4 do
-	af2[#af2+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		Name="Grade" ..i,
+	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Name="StarCount"..tier,
 		Text="",
-		FolderSummaryCommand=function(self,params)
-			local text = params.scores["Grade_Tier0"..i]
-			self:settext(text)
-			self:x(-210+columnWidth*(i+1))
-			self:y(52)
-			self:zoom(1.4)
-			if IsNotWide then
-				self:zoom(1.05)
-				self:x(-170+columnWidth*(i+1))
-				self:y(45)
-			end
-		end
-	}
-	af2[#af2+1] = Def.Sprite{
-		Texture=THEME:GetPathG("MusicWheelItem","Grades/grades 1x18.png"),
-		InitCommand=function(self) self:zoom( SL_WideScale(0.18, 0.3) ):animate(false) end,
-		FolderSummaryCommand=function(self, params)
-			self:setstate(grades["Grade_Tier0"..i])
-			self:x(-250+columnWidth*(i+1))
-			self:y(52)
-			self:zoom(0.5)
-			if IsNotWide then
-				self:zoom(0.38)
-				self:x(-200+columnWidth*(i+1))
-				self:y(45)
-			end
+		InitCommand=function(self)
+			self:xy(cell_x, COUNT_Y):zoom(COUNT_ZOOM)
+			self:maxwidth((CELL_W - 2) / COUNT_ZOOM):diffuse(HUD_TEXT)
+		end,
+		SetFolderCommand=function(self, params)
+			local n = params.tiers[tier]
+			-- a dim zero rather than a blank: "none at this tier" is an answer
+			self:settext(n):diffuse( n > 0 and HUD_TEXT or HUD_LABEL )
 		end
 	}
 end
-
-af[#af+1] = af2
 
 return af
