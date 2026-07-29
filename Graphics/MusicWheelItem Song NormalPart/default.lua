@@ -295,6 +295,14 @@ af[#af+1] = Def.BitmapText{
 		if not PROFILEMAN:IsPersistentProfile(player) then return end
 		local pn = ToEnumShortString(player)
 
+		-- An SRPG pack takes this column over entirely: no ITL hash is resolved, so no
+		-- rank is fetched for a song that has no ITL standing to fetch.
+		local event = params.Song and SRPGEventFromGroupName( params.Song:GetGroupName() )
+		if event then
+			self:playcommand("SetRate", { player=player, song=params.Song, event=event })
+			return
+		end
+
 		-- Resolves from pathMap, or computes+caches the hash on the fly if this
 		-- row's song has never been visited/fetched before (see
 		-- Scripts/SL-Helpers-ITLRank.lua). Gives on-screen songs priority over
@@ -308,6 +316,29 @@ af[#af+1] = Def.BitmapText{
 	end,
 	-- Points come from local data only (see ITLGetPoints) so they render right
 	-- away; no need to wait on the leaderboard fetch, which is only for ranks.
+	-- Stamina RPG packs are scored on the highest music rate you have cleared a chart at,
+	-- not on ITL points, so in one of those this column carries the rate instead. It is
+	-- the same column rather than a number of its own: the two events never overlap on a
+	-- pack, and a row has one slot for "how am I doing on this chart in the event".
+	--
+	-- This replaces Graphics/MusicWheelItem RPGRate.lua, which drew the figure separately
+	-- at hand-tuned per-aspect-ratio coordinates and re-read the whole .rpg file from disk
+	-- on every row of every scroll tick.
+	SetRateCommand=function(self, params)
+		self:visible(false)
+
+		local rate = SRPGBestRate(params.player, params.song, params.event)
+		if not rate then return end
+
+		local val = ("%.2f"):format(rate)
+		self:settext( val .. "x RATE" )
+		self:AddAttribute(#val + 1, { Length=5, Diffuse=ITL_LABEL_COLOR })
+		-- white at 1.0x through to red at 1.5x, the ramp the old actor used
+		local heat = clamp(scale(rate, 1.0, 1.5, 1, 0), 0, 1)
+		self:diffuse(1, heat, heat, 1)
+		self:visible(true)
+	end,
+
 	RefreshPointsCommand=function(self)
 		self:visible(false)
 		if not self.hash then return end
@@ -396,6 +427,12 @@ af[#af+1] = Def.BitmapText{
 		local player = humans[1]
 		if not PROFILEMAN:IsPersistentProfile(player) then return end
 		local pn = ToEnumShortString(player)
+
+		-- An SRPG song has no ITL standing, so don't resolve a hash for it and above all
+		-- don't enqueue a leaderboard fetch that can only come back empty. ITLRankManager
+		-- is rate-limited and backs off on HTTP 429; feeding it songs from the wrong event
+		-- would spend that budget for nothing.
+		if params.Song and SRPGEventFromGroupName( params.Song:GetGroupName() ) then return end
 
 		local hash = ITLResolveHashForSong(pn, params.Song)
 		if not hash then return end

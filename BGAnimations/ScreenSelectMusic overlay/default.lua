@@ -4,6 +4,10 @@
 -- any wheel row has been Set, which is exactly when to drop it.
 FolderProgressInvalidate()
 
+-- Same reasoning for the SRPG rates the song rows read: a run just played may have raised
+-- one, and the parsed .rpg file is held in a Scripts file that outlives this screen.
+SRPGInvalidate()
+
 local af = Def.ActorFrame{
 	-- GameplayReloadCheck is a kludgy global variable used in ScreenGameplay in.lua to check
 	-- if ScreenGameplay is being entered "properly" or being reloaded by a scripted mod-chart.

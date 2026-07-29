@@ -20,14 +20,46 @@
 -- band now, so bailing out would leave the header with no background at all.
 -- IndexOfPack, JumpToPack and RefreshCommand all tolerate an empty list, and the
 -- rail simply renders blank.
-local packs = SONGMAN:GetSongGroupNames() or {}
-
--- How many songs each pack holds, worked out once here rather than per Refresh.
+-- Only packs the wheel will actually show, and only their playable songs.
 --
--- Refresh runs on every CurrentSongChanged, i.e. every cran of scroll, and
--- SONGMAN:GetSongsInGroup builds a fresh Lua table of the whole pack each call -- 199
--- entries for ITL Online 2025 Unlocks. Counting all packs once at file scope is the same
--- idiom SongDescription/GroupDurations.lua uses, and strictly cheaper than what that file
+-- MusicWheel::GetSongList filters every song through SongUtil::IsSongPlayable
+-- (MusicWheel.cpp:540), so a song with no chart for the current game and style is simply
+-- not in the wheel -- and MusicWheel::SelectSong returns false for anything it cannot find
+-- there (MusicWheel.cpp:381). ITL packs are full of doubles-only entries: 60 of the 310
+-- songs in ITL Online 2026 have no dance-single chart at all.
+--
+-- Taking SONGMAN's raw group list meant the rail could aim at a song the wheel does not
+-- have. The jump then aborted, the index never moved, and pressing the key again aimed at
+-- the very same song -- so the rail wedged on that pack and everything past it became
+-- unreachable in that direction. ITL Online 2026 Unlocks did exactly this: its
+-- first-by-title song, "[2401] [08] bit mania (Hard)", is doubles-only.
+--
+-- Filtering here rather than at the jump keeps the whole rail honest: the n/total counter,
+-- the flanking pack names and the song count all describe packs you can actually reach.
+local packs = {}
+local pack_songs = {}
+
+for _, name in ipairs(SONGMAN:GetSongGroupNames() or {}) do
+	local playable = {}
+	for _, song in ipairs(SONGMAN:GetSongsInGroup(name) or {}) do
+		if #SongUtil.GetPlayableSteps(song) > 0 then
+			playable[#playable+1] = song
+		end
+	end
+
+	if #playable > 0 then
+		packs[#packs+1] = name
+		pack_songs[name] = playable
+	end
+end
+
+-- How many songs each pack holds, from the same pass -- playable ones, which is what the
+-- wheel shows you when you get there and what the engine's own section count reported.
+--
+-- Refresh runs on every CurrentSongChanged, i.e. every cran of scroll, so this cannot be
+-- worked out on demand: SONGMAN:GetSongsInGroup builds a fresh Lua table of the whole pack
+-- each call. Doing it once at file scope is the same idiom
+-- SongDescription/GroupDurations.lua uses, and strictly cheaper than what that file
 -- already does (it sums MusicLengthSeconds over every song).
 --
 -- This number is the one the wheel's group rows used to print at their right edge. That
@@ -36,7 +68,7 @@ local packs = SONGMAN:GetSongGroupNames() or {}
 -- the rest of "which pack am I in".
 local pack_song_counts = {}
 for _, name in ipairs(packs) do
-	pack_song_counts[name] = #(SONGMAN:GetSongsInGroup(name) or {})
+	pack_song_counts[name] = #pack_songs[name]
 end
 
 local accent = PlayerColor(PLAYER_1)
@@ -140,8 +172,10 @@ end
 -- whose sections aren't packs at all (BPM, artist, genre, meter) the wheel orders
 -- rows by that key instead, so we may not land on the section's literal first row
 -- -- but we still land inside the target pack, which is what the jump is for.
+-- Reads pack_songs, not SONGMAN, so it can only ever return a song the wheel actually
+-- holds -- see the filtering at the top of this file for why that matters.
 local function FirstSongInWheelOrder(group)
-	local songs = SONGMAN:GetSongsInGroup(group)
+	local songs = pack_songs[group]
 	if not songs or #songs == 0 then return nil end
 
 	local first = songs[1]

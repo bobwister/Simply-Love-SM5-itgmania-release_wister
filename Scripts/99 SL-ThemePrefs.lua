@@ -273,6 +273,14 @@ SL_CustomPrefs.Get = function()
 		{
 			Default = "",
 		},
+		-- Which event Auto last settled on. November through February belong to neither
+		-- season, so they keep running whatever was running before them. Hidden state:
+		-- no Choices, and not in any LineNames, so it never appears in a menu.
+		-- Seeded as SRPG, which is what is live when this shipped.
+		LastAutoEvent =
+		{
+			Default = "SRPG",
+		},
 		-- - - - - - - - - - - - - - - - - - - -
 		EnableTournamentMode = {
 			Default = false,
@@ -344,6 +352,20 @@ SL_CustomPrefs.Get = function()
 		{
 			Default = "Scorebox",
 			Choices = { "Scorebox", "Pane", "Off" }
+		},
+		-- Which online event the profile panels describe. Auto follows the calendar --
+		-- March to June ITL, July to October Stamina RPG, the rest carrying over
+		-- whichever ran last (see SRPGIsActiveEvent) -- and this row is how you overrule
+		-- it.
+		ActiveEvent =
+		{
+			Default = "Auto",
+			Choices = {
+				THEME:GetString("ThemePrefs", "ActiveEventAuto"),
+				THEME:GetString("ThemePrefs", "ActiveEventITL"),
+				THEME:GetString("ThemePrefs", "ActiveEventSRPG"),
+			},
+			Values  = { "Auto", "ITL", "SRPG" }
 		},
 		FolderStats =
 		{

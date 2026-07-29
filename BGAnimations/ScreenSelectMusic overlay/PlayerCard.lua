@@ -25,9 +25,20 @@ local PAD = 4
 
 local ITL_LABEL_X = -W/2 + PAD
 local ITL_VALUE_X =  W/2 - PAD
-local ITL_ROW_Y   = { 8, 21, 34 }
 local ITL_LABEL_ZOOM = 0.34
 local ITL_VALUE_ZOOM = 0.46
+
+-- The event block holds up to MAX_EVENT_ROWS rows, and however many the active event
+-- actually has are centred in it -- ITL has three, Stamina RPG two. Positions are worked
+-- out per refresh rather than fixed at init, so switching events re-centres the block
+-- instead of leaving a hole where the third row used to be.
+local MAX_EVENT_ROWS = 3
+local ROW_BLOCK_CY   = 21
+local ROW_SPACING    = 13
+
+local function RowY(i, count)
+	return ROW_BLOCK_CY + (i - (count + 1)/2) * ROW_SPACING
+end
 
 local RULE_Y = 44
 
@@ -89,12 +100,54 @@ local function GetItlStats()
 	return rp, tp, CountITLChartsPassedInSeason(player, ITLCurrentSeason())
 end
 
--- label key -> which of the three figures it prints
+-- label key -> which of the figures it prints. `fmt` is handed one table of everything
+-- the active event knows, so a row can print more than one figure without the caller
+-- having to know which rows do.
 local ITL_ROWS = {
-	{ key="ItlRankingPoints", pick=function(rp, tp, passed) return rp     end },
-	{ key="ItlTotalPoints",   pick=function(rp, tp, passed) return tp     end },
-	{ key="ItlChartsPassed",  pick=function(rp, tp, passed) return passed end },
+	{ key="ItlRankingPoints", fmt=function(s) return Commas(s.rp)     end },
+	{ key="ItlTotalPoints",   fmt=function(s) return Commas(s.tp)     end },
+	{ key="ItlChartsPassed",  fmt=function(s) return Commas(s.passed) end },
 }
+
+-- The equivalent rows during a Stamina RPG season. Two, not three: SRPG has no points to
+-- show. Its API node carries a per-chart leaderboard, a result string, and quest/stat
+-- progress that arrives once in the submit response and is never persisted -- there is no
+-- equivalent of itl2024.json.
+--
+-- All three are records of things that happened, not statistics derived from them: the
+-- best rate you cleared at, the hardest chart and fastest song you got through, and how
+-- many songs are in the record. An average rate briefly sat here and has been taken out --
+-- nothing in SRPG defines such a figure, so it was a number of my own invention sitting
+-- among official ones.
+--
+-- The middle row prints two figures, which is why fmt takes the whole stats table.
+--
+-- Only these rows swap. The star tally and the cleared count below the rule are read off
+-- the profile's own scores and mean the same thing whichever event is running.
+local SRPG_ROWS = {
+	{ key="SrpgBestRate", fmt=function(s) return ("%.2fx"):format(s.best) end },
+	{
+		key="SrpgHighest",
+		fmt=function(s)
+			return THEME:GetString("ScreenSelectMusic", "SrpgHighestFormat"):format(
+				s.meter and tostring(s.meter)      or "--",
+				s.bpm   and ("%.0f"):format(s.bpm) or "--"
+			)
+		end
+	},
+	{ key="SrpgSongsCleared", fmt=function(s) return Commas(s.cleared) end },
+}
+
+-- Which set of rows the card is showing, and the SRPG season if that is the one.
+-- Re-asked on every Refresh rather than settled at load, so swapping to a profile with a
+-- different history moves the card with it.
+local function ActiveRows()
+	if SRPGIsActiveEvent() then
+		local event = SRPGCurrentEvent()
+		if event then return SRPG_ROWS, event end
+	end
+	return ITL_ROWS, nil
+end
 
 local af = Def.ActorFrame{
 	Name="PlayerCard",
@@ -133,28 +186,51 @@ local af = Def.ActorFrame{
 
 af[#af+1] = HUDCardDecor(W, H, 0, H/2)
 
--- The ITL block: one labelled figure per row, label left, figure right.
-for i, row in ipairs(ITL_ROWS) do
-	local y = ITL_ROW_Y[i]
-
+-- The event block: one labelled figure per row, label left, figure right. How many rows
+-- there are, and what they say, depends on the season -- see ActiveRows. Rows past the
+-- active event's count hide themselves.
+for i = 1, MAX_EVENT_ROWS do
 	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		Text=THEME:GetString("ScreenSelectMusic", row.key),
+		Name="EventLabel"..i,
 		InitCommand=function(self)
-			self:horizalign(left):xy(ITL_LABEL_X, y):zoom(ITL_LABEL_ZOOM)
+			self:horizalign(left):x(ITL_LABEL_X):zoom(ITL_LABEL_ZOOM)
 			self:maxwidth((W - 2*PAD - 34) / ITL_LABEL_ZOOM):diffuse(HUD_LABEL)
+		end,
+		RefreshCommand=function(self)
+			local rows = ActiveRows()
+			if i > #rows then self:visible(false) return end
+
+			self:visible(true):y( RowY(i, #rows) )
+			self:settext( THEME:GetString("ScreenSelectMusic", rows[i].key) )
 		end
 	}
 
 	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		Name="Itl"..i,
+		Name="EventValue"..i,
 		InitCommand=function(self)
-			self:horizalign(right):xy(ITL_VALUE_X, y):zoom(ITL_VALUE_ZOOM)
+			self:horizalign(right):x(ITL_VALUE_X):zoom(ITL_VALUE_ZOOM)
 			self:diffuse(HUD_TEXT)
 		end,
+		-- "--" rather than 0 in both branches: no event file loaded is not the same as a
+		-- record of nothing.
 		RefreshCommand=function(self)
-			local rp, tp, passed = GetItlStats()
-			-- "--" rather than 0: no ITL file loaded is not the same as a score of nothing
-			self:settext( rp and Commas(row.pick(rp, tp, passed)) or "--" )
+			local rows, event = ActiveRows()
+			if i > #rows then self:visible(false) return end
+
+			self:visible(true):y( RowY(i, #rows) )
+
+			if event then
+				local best, cleared = SRPGProfileStats(player, event)
+				if not best then self:settext("--") return end
+
+				-- only asked for once there is something to report; it walks the season's
+				-- packs, so there is no point paying for it on an empty record
+				local meter, bpm = SRPGPassedPeaks(player, event)
+				self:settext( rows[i].fmt{ best=best, cleared=cleared, meter=meter, bpm=bpm } )
+			else
+				local rp, tp, passed = GetItlStats()
+				self:settext( rp and rows[i].fmt{ rp=rp, tp=tp, passed=passed } or "--" )
+			end
 		end
 	}
 end

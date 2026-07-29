@@ -23,10 +23,9 @@ local af = Def.ActorFrame{
 }
 
 
-local players = GAMESTATE:GetHumanPlayers()
-
-for i in ivalues(players) do
-	af[#af+1] = LoadActor(THEME:GetPathG("", "MusicWheelItem RPGRate.lua"), i)
-end
+-- The per-player SRPG rate actor that used to be loaded here is gone. The rate now shares
+-- the song row's event column with ITL points -- an SRPG pack shows a rate there, an ITL
+-- pack shows points -- rather than being drawn separately at its own hand-tuned
+-- coordinates. See Graphics/MusicWheelItem Song NormalPart/default.lua, SetRateCommand.
 
 return af
