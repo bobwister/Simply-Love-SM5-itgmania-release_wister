@@ -133,6 +133,22 @@ local SRPG_ROWS = {
 	{ key="SrpgSongsCleared", fmt=function(s) return Commas(s.cleared) end },
 }
 
+-- Which set of rows the card is showing, and the SRPG season if that is the one.
+-- Re-asked on every Refresh rather than settled at load, so swapping to a profile with a
+-- different history moves the card with it.
+--
+-- Declared BEFORE CompositeRow, and that order matters: a `local function` is only in
+-- scope from its own declaration onward, so a caller written above it would bind the
+-- name to a nil global instead. The row actors further down escape this because their
+-- commands are closures created after both declarations.
+local function ActiveRows()
+	if SRPGIsActiveEvent() then
+		local event = SRPGCurrentEvent()
+		if event then return SRPG_ROWS, event end
+	end
+	return ITL_ROWS, nil
+end
+
 -- Where the composite row sits in the active set, if it is showing at all.
 -- Returns index, row count, event -- or nil.
 local function CompositeRow()
@@ -141,17 +157,6 @@ local function CompositeRow()
 		if row.composite then return i, #rows, event end
 	end
 	return nil
-end
-
--- Which set of rows the card is showing, and the SRPG season if that is the one.
--- Re-asked on every Refresh rather than settled at load, so swapping to a profile with a
--- different history moves the card with it.
-local function ActiveRows()
-	if SRPGIsActiveEvent() then
-		local event = SRPGCurrentEvent()
-		if event then return SRPG_ROWS, event end
-	end
-	return ITL_ROWS, nil
 end
 
 local af = Def.ActorFrame{
