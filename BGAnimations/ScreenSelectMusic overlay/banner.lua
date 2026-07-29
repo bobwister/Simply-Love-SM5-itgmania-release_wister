@@ -48,8 +48,10 @@ t[#t+1] = Def.Quad{
 	Name="BannerFrame",
 	InitCommand=function(self)
 		self:setsize(bannerWidth + 4, bannerHeight + 4):x(ART_DX)
-		self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.45) )
-	end
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.45) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- fallback banner
@@ -57,6 +59,15 @@ t[#t+1] = Def.Sprite{
 	Name="FallbackBanner",
 	Texture=banner_directory.."/banner"..SL.Global.ActiveColorIndex.." (doubleres).png",
 	InitCommand=function(self) self:setsize(bannerWidth, bannerHeight):x(ART_DX) end,
+
+	-- Texture= above is resolved once, when this file loads, so the fallback art cannot
+	-- follow a color change by itself -- it has to be reloaded. Load() drops the actor's
+	-- size, hence the setsize repeat. Visibility is left alone: whether the fallback or
+	-- the song's own banner is showing is SetCommand's business, not this one's.
+	ColorSelectedMessageCommand=function(self)
+		self:Load(banner_directory.."/banner"..SL.Global.ActiveColorIndex.." (doubleres).png")
+		self:setsize(bannerWidth, bannerHeight):x(ART_DX)
+	end,
 
 	CurrentSongChangedMessageCommand=function(self) self:playcommand("Set") end,
 	CurrentCourseChangedMessageCommand=function(self) self:playcommand("Set") end,

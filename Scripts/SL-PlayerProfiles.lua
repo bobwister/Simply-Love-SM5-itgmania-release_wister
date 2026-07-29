@@ -161,6 +161,56 @@ LoadGuest = function(player)
 end
 
 
+-- -----------------------------------------------------------------------
+-- Two things in the profile ini are NOT per-player modifiers: the Simply Love color and
+-- which of the two online events the panels report on. They are single, theme-wide pieces
+-- of state -- SL.Global.ActiveColorIndex and the ActiveEvent theme pref -- so they cannot
+-- go through permitted_profile_settings, which exists to route keys into the per-player
+-- SL[pn].ActiveModifiers table.
+--
+-- They are applied by setting the same runtime state the option screens set, rather than
+-- by adding a per-profile override alongside it. That matters: every existing reader
+-- (PlayerColor -> GetHexColor(SL.Global.ActiveColorIndex) in SL-Colors.lua, and
+-- SRPGIsActiveEvent -> ThemePrefs.Get("ActiveEvent")) keeps working untouched, and the
+-- option rows in the menus keep working too -- an override would have shadowed them, so
+-- changing Active Event in the menu would have appeared to do nothing.
+--
+-- The consequence to know: the machine-wide prefs become "whatever the last profile to
+-- load wanted". That is already how SimplyLoveColor behaved, and it is what a guest with
+-- no profile of their own inherits.
+--
+-- ThemePrefs.Save() is deliberately NOT called here. The profile ini is the source of
+-- truth for these two, and this runs on every profile switch, so saving would rewrite the
+-- machine ini each time for no gain.
+--
+-- Only the master player's profile is honoured. There is one color and one event panel for
+-- the whole theme, so in versus the second profile to load would otherwise silently
+-- overwrite the first; this way P2 switching profiles cannot repaint P1's theme. P2's own
+-- values are still written to P2's profile by SaveProfileCustom, they are just not applied.
+local function ApplyGlobalProfileSettings(player, filecontents)
+	if not filecontents then return end
+	if player ~= (GAMESTATE:GetMasterPlayerNumber() or PLAYER_1) then return end
+
+	-- Validated rather than trusted: the header of this file notes that players can and do
+	-- hand-edit their UserPrefs.ini, and an out-of-range index here would be indexed
+	-- straight into SL.Colors by GetHexColor.
+	local color = tonumber(filecontents.SimplyLoveColor)
+	if color and color == math.floor(color) and color >= 1 and color <= #SL.Colors then
+		if color ~= SL.Global.ActiveColorIndex then
+			SL.Global.ActiveColorIndex = color
+			ThemePrefs.Set("SimplyLoveColor", color)
+			-- what ScreenSelectColor broadcasts, and what the shared backgrounds, the
+			-- header and the footer listen for
+			MESSAGEMAN:Broadcast("ColorSelected")
+		end
+	end
+
+	local event = filecontents.ActiveEvent
+	if event == "Auto" or event == "ITL" or event == "SRPG" then
+		ThemePrefs.Set("ActiveEvent", event)
+	end
+end
+
 -- function assigned to "CustomLoadFunction" under [Profile] in metrics.ini
 LoadProfileCustom = function(profile, dir)
 
@@ -190,6 +240,9 @@ LoadProfileCustom = function(profile, dir)
 
 	if pn and FILEMAN:DoesFileExist(path) then
 		filecontents = IniFile.ReadFile(path)[theme_name]
+
+		-- the color and the active event, which are theme-wide rather than per-player
+		ApplyGlobalProfileSettings(player, filecontents)
 
 		-- for each key/value pair read in from the player's profile
 		for k,v in pairs(filecontents) do
@@ -250,6 +303,13 @@ SaveProfileCustom = function(profile, dir)
 			-- these values are saved outside the SL[pn].ActiveModifiers tables
 			-- and thus won't be handled in the loop above
 			output.PlayerOptionsString = SL[pn].PlayerOptionsString
+
+			-- Theme-wide settings kept per profile so the look and the event panel follow
+			-- whoever is playing. See ApplyGlobalProfileSettings for why these two can't
+			-- ride in permitted_profile_settings, and why only the master player's copy is
+			-- applied on load even though every profile writes its own.
+			output.SimplyLoveColor = SL.Global.ActiveColorIndex
+			output.ActiveEvent     = ThemePrefs.Get("ActiveEvent")
 
 			IniFile.WriteFile( path, {[theme_name]=output} )
 

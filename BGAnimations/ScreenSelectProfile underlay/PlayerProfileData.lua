@@ -96,6 +96,24 @@ local RetrieveProfileData = function(profile, dir)
 end
 
 -- ----------------------------------------------------
+-- The profile's own Simply Love color index, for the swatch beside its name in the
+-- scroller, or nil for a profile that has never saved one.
+--
+-- It has to come off the ini: this screen is where you CHOOSE which profile to load, so
+-- nothing is loaded yet and disk is the only place the color exists. RetrieveProfileData
+-- returns false when the file is absent, hence the type check.
+--
+-- Validated rather than passed straight through, because GetHexColor keeps any number in
+-- bounds with a modulo -- so a hand-edited "47" would quietly show a real color instead of
+-- showing none, and these files do get hand-edited.
+local ProfileColorIndex = function(userprefs)
+	if type(userprefs) ~= "table" then return nil end
+	local n = tonumber(userprefs.SimplyLoveColor)
+	if not n or n ~= math.floor(n) or n < 1 or n > #SL.Colors then return nil end
+	return n
+end
+
+-- ----------------------------------------------------
 -- Retrieve and process data (mods, most recently played song, high score name, etc.)
 -- for each available local profile and put it in the profile_data table.
 -- Since both players are using the same list of local profiles, this only needs to be performed once (not once for each player).
@@ -123,6 +141,7 @@ for i=1, PROFILEMAN:GetNumLocalProfiles() do
 		noteskin = noteskin,
 		judgment = judgment,
 		guid = profile:GetGUID(),
+		colorindex = ProfileColorIndex(userprefs),
 	}
 
 	table.insert(profile_data, data)

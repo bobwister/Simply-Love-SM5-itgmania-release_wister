@@ -5,7 +5,11 @@ local num_visible_items = num_items - 2
 local item_width = _screen.w / 2.125
 local item_height = _screen.h / num_visible_items
 
-local accent = PlayerColor(PLAYER_1)
+-- Read through a function and never captured in a local, so every actor below can repaint
+-- itself on ColorSelected. The Simply Love color changes without a screen reload when a
+-- profile is switched from the song wheel; a captured value would freeze the cursor on the
+-- previous profile's color while the rows around it changed.
+local function Accent() return PlayerColor(PLAYER_1) end
 
 local af = Def.ActorFrame{}
 
@@ -20,6 +24,9 @@ af[#af+1] = Def.ActorFrame{
 	-- additive halo bleeding just past the row's edges. Vertices are left white
 	-- so the pulsing diffuse below is what carries the accent color; tinting
 	-- both would square the hue and muddy it.
+	--
+	-- Which also means repainting it is just the two effect colors -- the vertex
+	-- array is color-free and does not need rebuilding.
 	Def.ActorMultiVertex{
 		InitCommand=function(self)
 			local white = {1,1,1,1}
@@ -27,15 +34,21 @@ af[#af+1] = Def.ActorFrame{
 			self:SetDrawState({Mode="DrawMode_Fan"}):SetNumVertices(#v):SetVertices(v)
 			self:x(-6):blend("BlendMode_Add")
 			self:diffuseshift():effectperiod(3)
-			self:effectcolor1(DimColor(accent, 1.00, 0.10))
-			self:effectcolor2(DimColor(accent, 1.00, 0.26))
-		end
+			self:playcommand("Paint")
+		end,
+		PaintCommand=function(self)
+			self:effectcolor1(DimColor(Accent(), 1.00, 0.10))
+			self:effectcolor2(DimColor(Accent(), 1.00, 0.26))
+		end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 
-	-- bright slanted bar down the leading edge
+	-- bright slanted bar down the leading edge. Its color IS in the vertex array,
+	-- so this one has to rebuild rather than re-diffuse.
 	Def.ActorMultiVertex{
-		InitCommand=function(self)
-			local c = DimColor(accent, 1.00, 0.95)
+		InitCommand=function(self) self:playcommand("Paint") end,
+		PaintCommand=function(self)
+			local c = DimColor(Accent(), 1.00, 0.95)
 			local top, bot = -item_height/2, item_height/2
 			local b, w = SL_WHEEL_BEVEL, 3
 			local v = {
@@ -45,21 +58,28 @@ af[#af+1] = Def.ActorFrame{
 				{{0,     bot, 0}, c},
 			}
 			self:SetDrawState({Mode="DrawMode_Fan"}):SetNumVertices(#v):SetVertices(v)
-		end
+		end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 
 	-- hairline rules along the (unslanted) top and bottom edges
 	Def.Quad{
 		InitCommand=function(self)
 			self:horizalign(left):zoomto(item_width - SL_WHEEL_BEVEL, 1.5)
-			self:xy(SL_WHEEL_BEVEL, -item_height/2):diffuse(DimColor(accent, 1.00, 0.85))
-		end
+			self:xy(SL_WHEEL_BEVEL, -item_height/2)
+			self:playcommand("Paint")
+		end,
+		PaintCommand=function(self) self:diffuse(DimColor(Accent(), 1.00, 0.85)) end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 	Def.Quad{
 		InitCommand=function(self)
 			self:horizalign(left):zoomto(item_width - SL_WHEEL_BEVEL, 1.5)
-			self:xy(0, item_height/2):diffuse(DimColor(accent, 1.00, 0.85))
-		end
+			self:xy(0, item_height/2)
+			self:playcommand("Paint")
+		end,
+		PaintCommand=function(self) self:diffuse(DimColor(Accent(), 1.00, 0.85)) end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 }
 
@@ -125,6 +145,9 @@ for player in ivalues(GAMESTATE:GetHumanPlayers()) do
 				if params.Player ~= player then return false end
 				self:settext( ("%s%s"):format(SL[pn].ActiveModifiers.SpeedModType, SL[pn].ActiveModifiers.SpeedMod) )
 			end,
+			-- PlayerColor, not Accent: in versus each side's figure keeps its own
+			-- side's color, and PlayerColor derives P2's from the same index.
+			ColorSelectedMessageCommand=function(self) self:diffuse(PlayerColor(player)) end,
 		}
 end
 

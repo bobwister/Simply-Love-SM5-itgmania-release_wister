@@ -128,8 +128,10 @@ local af = Def.ActorFrame{
 	Def.Quad{
 		InitCommand=function(self)
 			self:setsize(W + BORDER, H + BORDER)
-			self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.45) )
-		end
+			self:playcommand("Paint")
+		end,
+		PaintCommand=function(self) self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.45) ) end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 
 	Def.Quad{

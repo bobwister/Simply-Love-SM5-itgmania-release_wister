@@ -64,7 +64,9 @@ local QUINT_ICON  = THEME:GetPathG("MusicWheelItem", "Grades/quint.png")
 -- the screen has settled rather than during load -- see StarCountsCompute.
 local SCAN_DELAY = 0.6
 
-local accent = PlayerColor(player)
+-- Read at paint time, not captured: a profile switch from the wheel changes the Simply
+-- Love color without a screen reload, and the actors below repaint on ColorSelected.
+local function Accent() return PlayerColor(player) end
 
 -- 12480 -> "12,480". There is no commify() in this theme or the fallback.
 local function Commas(n)
@@ -312,8 +314,10 @@ af[#af+1] = peaks
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
 		self:zoomto(W - PAD*2, 1):y(RULE_Y)
-		self:diffuse( DimColor(accent, 1.0, 0.20) )
-	end
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse( DimColor(Accent(), 1.0, 0.20) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- Left edge and centre line of grid slot `slot` (1..6), in reading order.

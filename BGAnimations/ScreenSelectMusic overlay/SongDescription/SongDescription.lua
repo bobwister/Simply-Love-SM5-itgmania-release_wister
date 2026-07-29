@@ -61,8 +61,10 @@ af[#af+1] = Def.Quad{
 	Name="DescriptionRule",
 	InitCommand=function(self)
 		self:zoomto(_w - 24, 1):y(0)
-		self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.20) )
-	end
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse( DimColor(PlayerColor(PLAYER_1), 1.0, 0.20) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- ActorFrame for Artist, BPM, and Song length

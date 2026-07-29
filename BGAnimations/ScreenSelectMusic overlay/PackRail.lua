@@ -71,7 +71,9 @@ for _, name in ipairs(packs) do
 	pack_song_counts[name] = #pack_songs[name]
 end
 
-local accent = PlayerColor(PLAYER_1)
+-- Read at paint time, not captured: a profile switch from the wheel changes the Simply
+-- Love color without a screen reload, and the actors below repaint on ColorSelected.
+local function Accent() return PlayerColor(PLAYER_1) end
 -- TWEAK: rail text brightness. These sat well against the old see-through header
 -- but read as muddy on the opaque band, so they are pitched brighter here: the
 -- flanking pack names stay clearly subordinate to the accent-coloured current
@@ -334,8 +336,10 @@ local af = Def.ActorFrame{
 		InitCommand=function(self)
 			self:zoomto(_screen.w, 1):vertalign(top)
 			self:xy(0, 32 - RAIL_Y)
-			self:diffuse(DimColor(accent, 1.0, 0.45))
-		end
+			self:playcommand("Paint")
+		end,
+		PaintCommand=function(self) self:diffuse(DimColor(Accent(), 1.0, 0.45)) end,
+		ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 	},
 
 	-- previous pack, dimmed
@@ -370,11 +374,12 @@ local af = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="Current",
 		InitCommand=function(self)
-			self:zoom(CURRENT_ZOOM):maxwidth(170/CURRENT_ZOOM):diffuse(accent)
+			self:zoom(CURRENT_ZOOM):maxwidth(170/CURRENT_ZOOM):diffuse(Accent())
 		end,
 		SetRailCommand=function(self, params)
 			self:settext(params and params.current or "")
-		end
+		end,
+		ColorSelectedMessageCommand=function(self) self:diffuse(Accent()) end
 	},
 
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{

@@ -51,7 +51,9 @@ end
 
 -- -----------------------------------------------------------------------
 
-local accent = PlayerColor(PLAYER_1)
+-- Read at paint time, not captured: a profile switch from the wheel changes the Simply
+-- Love color without a screen reload, and the actors below repaint on ColorSelected.
+local function Accent() return PlayerColor(PLAYER_1) end
 local label_color = color("#7C939E")
 local value_zoom = SL_WideScale(0.28, 0.32)
 local label_zoom = 0.5
@@ -102,8 +104,10 @@ af[#af+1] = Def.Quad{
 	InitCommand=function(self)
 		self:zoomto(_screen.w, 1):vertalign(bottom)
 		self:xy(_screen.cx, _screen.h - 32)
-		self:diffuse(DimColor(accent, 1.0, 0.45))
-	end
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse(DimColor(Accent(), 1.0, 0.45)) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- -----------------------------------------------------------------------
@@ -136,8 +140,9 @@ af[#af+1] = Def.ActorFrame{
 		Name="PlayTimer",
 		InitCommand=function(self)
 			play_bmt = self
-			self:horizalign(left):zoom(value_zoom):xy(64, value_baseline_fix):diffuse(accent)
-		end
+			self:horizalign(left):zoom(value_zoom):xy(64, value_baseline_fix):diffuse(Accent())
+		end,
+		ColorSelectedMessageCommand=function(self) self:diffuse(Accent()) end
 	},
 }
 

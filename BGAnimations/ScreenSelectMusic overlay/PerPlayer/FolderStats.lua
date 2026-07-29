@@ -23,7 +23,9 @@ if not ThemePrefs.Get("FolderStats") then return end
 local player = ...
 local pn = ToEnumShortString(player)
 
-local accent = PlayerColor(player)
+-- Read at paint time, not captured: a profile switch from the wheel changes the Simply
+-- Love color without a screen reload, and the actors below repaint on ColorSelected.
+local function Accent() return PlayerColor(player) end
 
 -- TWEAK: the card.
 --
@@ -155,9 +157,10 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 	Text="",
 	InitCommand=function(self)
 		self:y(NAME_Y):zoom(NAME_ZOOM):maxwidth((W - 2*PAD) / NAME_ZOOM)
-		self:diffuse(accent)
+		self:diffuse(Accent())
 	end,
-	SetFolderCommand=function(self, params) self:settext(params.group) end
+	SetFolderCommand=function(self, params) self:settext(params.group) end,
+	ColorSelectedMessageCommand=function(self) self:diffuse(Accent()) end
 }
 
 -- Which difficulty is being counted, left, and the clear progress, right. The difficulty
@@ -188,8 +191,10 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
 		self:zoomto(W - 2*PAD, 1):y(RULE_Y)
-		self:diffuse( DimColor(accent, 1.0, 0.20) )
-	end
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse( DimColor(Accent(), 1.0, 0.20) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- The tally: five tiers, best first, icon over count.

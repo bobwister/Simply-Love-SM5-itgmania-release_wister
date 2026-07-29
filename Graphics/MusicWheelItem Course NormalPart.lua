@@ -9,17 +9,27 @@ local item_height = _screen.h / num_visible_items
 -- "Technique HUD" restyle: rows are smoked-glass parallelograms, with the
 -- player's Simply Love color surviving only as a tint on the leading edge
 -- rather than flooding the whole row. See Scripts/SL-Helpers-WheelPlate.lua.
-local accent = PlayerColor(PLAYER_1)
-local tint = DimColor(accent, 0.30, 0.90) -- darkened so titles stay legible
-local ink  = { 0.045, 0.070, 0.085, 0.84 }
-local edge = DimColor(accent, 0.55, 0.50)
+-- Derived inside functions rather than captured in locals: WheelPlate re-runs these on
+-- ColorSelected so the rows repaint when the Simply Love color changes without a screen
+-- reload, which is what a profile switch from the song wheel does.
+local ink = { 0.045, 0.070, 0.085, 0.84 }
+
+local function edge_colors()
+	local edge = DimColor(PlayerColor(PLAYER_1), 0.55, 0.50)
+	return edge, edge
+end
+
+local function face_colors()
+	-- darkened so titles stay legible
+	return DimColor(PlayerColor(PLAYER_1), 0.30, 0.90), ink
+end
 
 local af = Def.ActorFrame{
 	-- the MusicWheel is centered via metrics under [ScreenSelectMusic]; offset by a slight amount to the right here
 	InitCommand=function(self) self:x(WideScale(28,33)) end,
 
-	WheelPlate(item_width, item_height, edge, edge),
-	WheelPlate(item_width, item_height, tint, ink, 1),
+	WheelPlate(item_width, item_height, edge_colors),
+	WheelPlate(item_width, item_height, face_colors, 1),
 }
 
 

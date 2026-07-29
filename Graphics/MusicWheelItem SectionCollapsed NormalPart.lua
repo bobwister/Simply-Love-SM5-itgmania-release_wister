@@ -9,17 +9,24 @@ local item_height = _screen.h / num_visible_items
 -- "Technique HUD": same parallelogram plate as the expanded header
 -- (Scripts/SL-Helpers-WheelPlate.lua) but dimmer, so a closed pack reads as
 -- present-but-inactive next to the open one.
-local accent = PlayerColor(PLAYER_1)
-local lit  = DimColor(accent, 0.70, 0.20)
-local fade = DimColor(accent, 0.35, 0.04)
-local edge = DimColor(accent, 0.70, 0.38)
+-- Derived inside functions rather than captured in locals, so WheelPlate can repaint these
+-- on ColorSelected -- see the comment in MusicWheelItem Course NormalPart.lua.
+local function edge_colors()
+	local edge = DimColor(PlayerColor(PLAYER_1), 0.70, 0.38)
+	return edge, edge
+end
+
+local function face_colors()
+	local accent = PlayerColor(PLAYER_1)
+	return DimColor(accent, 0.70, 0.20), DimColor(accent, 0.35, 0.04)
+end
 
 local af = Def.ActorFrame{
 	-- the MusicWheel is centered via metrics under [ScreenSelectMusic]; offset by a slight amount to the right here
 	InitCommand=function(self) self:x(WideScale(28,33)) end,
 
-	WheelPlate(item_width, item_height, edge, edge),
-	WheelPlate(item_width, item_height, lit, fade, 1),
+	WheelPlate(item_width, item_height, edge_colors),
+	WheelPlate(item_width, item_height, face_colors, 1),
 }
 
 if ThemePrefs.Get("SongSelectBG") ~= "Off" then

@@ -28,14 +28,31 @@ end
 
 -- Def.ActorMultiVertex rendering one plate. `inset` shrinks it on all sides so a
 -- larger plate behind can show through as a hairline border.
-WheelPlate = function(w, h, c_left, c_right, inset)
+--
+-- `getcolors` is a FUNCTION returning the two colors, not the colors themselves. That is
+-- deliberate: the Simply Love color can change while a screen is up -- switching profile
+-- from the song wheel applies the new profile's color without rebuilding the screen -- so
+-- the plate has to be able to recompute, which means it needs the recipe rather than the
+-- result. Callers that captured `local accent = PlayerColor(...)` at file scope froze the
+-- color at load and could never repaint.
+WheelPlate = function(w, h, getcolors, inset)
 	inset = inset or 0
+
+	-- Vertex colors live inside the vertex array, so repainting means rebuilding it.
+	-- A diffuse() could not do this job: the plate is a gradient between two different
+	-- colors, and diffuse would flatten it to one.
+	local function paint(self)
+		local c_left, c_right = getcolors()
+		local v = WheelPlateVerts(w - inset*2, h - inset*2, SL_WHEEL_BEVEL, c_left, c_right)
+		self:SetDrawState({Mode="DrawMode_Fan"}):SetNumVertices(#v):SetVertices(v)
+	end
+
 	return Def.ActorMultiVertex{
 		InitCommand=function(self)
-			local v = WheelPlateVerts(w - inset*2, h - inset*2, SL_WHEEL_BEVEL, c_left, c_right)
-			self:SetDrawState({Mode="DrawMode_Fan"}):SetNumVertices(#v):SetVertices(v)
+			paint(self)
 			self:x(inset)
-		end
+		end,
+		ColorSelectedMessageCommand=paint,
 	}
 end
 
@@ -98,19 +115,28 @@ HUDCardDecor = function(w, h, dx, dy, corners)
 		InitCommand=function(self) self:xy(dx, dy) end
 	}
 
+	-- Read at paint time rather than captured, so a profile switch from the song wheel
+	-- repaints the brackets instead of leaving them on the previous profile's color.
+	-- Every panel in the theme that calls HUDCardDecor inherits this.
+	local function paint(self)
+		self:diffuse(DimColor(PlayerColor(PLAYER_1), 1.0, HUD_CARD_ALPHA))
+	end
+
 	-- One L, anchored at (cx,cy) growing inward by (sx,sy) which are each +/-1.
 	local function bracket(cx, cy, sx, sy)
 		af[#af+1] = Def.Quad{
 			InitCommand=function(self)
 				self:zoomto(arm, thick):xy(cx + sx*arm/2, cy + sy*thick/2)
-				self:diffuse(DimColor(PlayerColor(PLAYER_1), 1.0, HUD_CARD_ALPHA))
-			end
+				paint(self)
+			end,
+			ColorSelectedMessageCommand=paint,
 		}
 		af[#af+1] = Def.Quad{
 			InitCommand=function(self)
 				self:zoomto(thick, arm):xy(cx + sx*thick/2, cy + sy*arm/2)
-				self:diffuse(DimColor(PlayerColor(PLAYER_1), 1.0, HUD_CARD_ALPHA))
-			end
+				paint(self)
+			end,
+			ColorSelectedMessageCommand=paint,
 		}
 	end
 
