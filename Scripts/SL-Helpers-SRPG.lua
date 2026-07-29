@@ -196,15 +196,41 @@ local function GroupsForEvent(event)
 	return event_groups[event] or {}
 end
 
+-- The music rate a high score was set at.
+--
+-- SongOptions::GetMods writes it into the score's modifier string as "<rate>xMusic"
+-- (SongOptions.cpp:65-72) and OMITS it entirely at 1.0x -- which is why a missing value
+-- means 1.0 rather than "unknown". It also trims one trailing zero, so 1.50 is stored as
+-- "1.5"; tonumber does not care.
+--
+-- The speed mod lives in the same string as a bare "3.95x". Requiring the literal
+-- "xMusic" is what keeps the two apart.
+local function RateFromModifiers(mods)
+	if not mods then return 1.0 end
+	return tonumber( mods:match("([%d%.]+)xMusic") ) or 1.0
+end
+
 -- -----------------------------------------------------------------------
--- The hardest chart and the fastest song this profile has passed in one Stamina RPG
--- season. Returns meter, bpm -- nil, nil when nothing has been passed.
+-- The hardest chart and the fastest EFFECTIVE bpm this profile has passed in one Stamina
+-- RPG season. Returns meter, bpm -- nil, nil when nothing has been passed.
+--
+-- The bpm is the song's own top bpm multiplied by the rate the run was played at, because
+-- that is the speed that was actually read: clearing a 200bpm song at 1.5x is 300bpm of
+-- stamina, and on a rate-ranked event calling it 200 would be the wrong answer.
+-- Song:GetDisplayBpms returns the chart's unmodified bpms (Song.cpp:2344), so the
+-- multiplication here is the only one applied.
 --
 -- These do NOT come from the .rpg file: that format records a title and a rate, and
 -- nothing else -- not even which chart of the song was played. So they come from the
 -- profile's own scores instead, the same source the star tally and the wheel's clear
 -- progress read, which means they also cover charts passed before the rate rules let
 -- anything be recorded.
+--
+-- Every stored score on a chart is examined, not just the best one. The list is ordered by
+-- score, so the fastest pass is not necessarily first -- and the top entry can even be a
+-- failed run that out-percented the passes. (FolderProgressGet still looks only at the
+-- top score; that is the older convention this theme counts clears with, left alone here
+-- rather than changed underneath figures already on screen.)
 --
 -- Restricted to charts playable in the current style, so a doubles chart cannot set the
 -- record on a single cabinet.
@@ -226,29 +252,29 @@ SRPGPassedPeaks = function(player, event)
 
 	for _, group in ipairs(GroupsForEvent(event)) do
 		for song in ivalues(SONGMAN:GetSongsInGroup(group)) do
-			local passed = false
+			-- {min, max}; a variable-bpm song counts at its fastest, which is the number
+			-- that makes it hard. Read once per song rather than once per score.
+			local bpms = song:GetDisplayBpms()
+			local song_top = bpms and bpms[2]
 
 			for steps in ivalues(SongUtil.GetPlayableSteps(song)) do
 				if steps:GetStepsType() == stepstype then
 					local list = profile:GetHighScoreListIfExists(song, steps)
+
 					if list then
-						local scores = list:GetHighScores()
-						if scores and #scores > 0 and scores[1]:GetGrade() ~= "Grade_Failed" then
-							passed = true
-							local m = steps:GetMeter()
-							if meter == nil or m > meter then meter = m end
+						for score in ivalues(list:GetHighScores()) do
+							if score:GetGrade() ~= "Grade_Failed" then
+								local m = steps:GetMeter()
+								if meter == nil or m > meter then meter = m end
+
+								if song_top then
+									local effective = song_top * RateFromModifiers(score:GetModifiers())
+									if bpm == nil or effective > bpm then bpm = effective end
+								end
+							end
 						end
 					end
 				end
-			end
-
-			-- BPM is the song's, so it is only asked for once the song has been passed on
-			-- some chart. GetDisplayBpms is {min, max}; a variable-BPM song counts at its
-			-- fastest, which is the number that makes it hard.
-			if passed then
-				local bpms = song:GetDisplayBpms()
-				local top = bpms and bpms[2]
-				if top and (bpm == nil or top > bpm) then bpm = top end
 			end
 		end
 	end

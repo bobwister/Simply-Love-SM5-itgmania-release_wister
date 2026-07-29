@@ -126,17 +126,22 @@ local ITL_ROWS = {
 -- the profile's own scores and mean the same thing whichever event is running.
 local SRPG_ROWS = {
 	{ key="SrpgBestRate", fmt=function(s) return ("%.2fx"):format(s.best) end },
-	{
-		key="SrpgHighest",
-		fmt=function(s)
-			return THEME:GetString("ScreenSelectMusic", "SrpgHighestFormat"):format(
-				s.meter and tostring(s.meter)      or "--",
-				s.bpm   and ("%.0f"):format(s.bpm) or "--"
-			)
-		end
-	},
+	-- Two labelled figures on one line. `composite` tells the generic row loop to leave
+	-- this slot alone -- it is drawn by the chained frame further down instead, which the
+	-- usual label-left/value-right pair cannot express.
+	{ composite=true },
 	{ key="SrpgSongsCleared", fmt=function(s) return Commas(s.cleared) end },
 }
+
+-- Where the composite row sits in the active set, if it is showing at all.
+-- Returns index, row count, event -- or nil.
+local function CompositeRow()
+	local rows, event = ActiveRows()
+	for i, row in ipairs(rows) do
+		if row.composite then return i, #rows, event end
+	end
+	return nil
+end
 
 -- Which set of rows the card is showing, and the SRPG season if that is the one.
 -- Re-asked on every Refresh rather than settled at load, so swapping to a profile with a
@@ -198,7 +203,7 @@ for i = 1, MAX_EVENT_ROWS do
 		end,
 		RefreshCommand=function(self)
 			local rows = ActiveRows()
-			if i > #rows then self:visible(false) return end
+			if i > #rows or rows[i].composite then self:visible(false) return end
 
 			self:visible(true):y( RowY(i, #rows) )
 			self:settext( THEME:GetString("ScreenSelectMusic", rows[i].key) )
@@ -215,7 +220,7 @@ for i = 1, MAX_EVENT_ROWS do
 		-- record of nothing.
 		RefreshCommand=function(self)
 			local rows, event = ActiveRows()
-			if i > #rows then self:visible(false) return end
+			if i > #rows or rows[i].composite then self:visible(false) return end
 
 			self:visible(true):y( RowY(i, #rows) )
 
@@ -234,6 +239,66 @@ for i = 1, MAX_EVENT_ROWS do
 		end
 	}
 end
+
+-- The composite row: "<label> : <value> | <label> : <value>", laid out as a chain rather
+-- than as one string with AddAttribute. Character offsets into a settext'd string index
+-- characters, not bytes, so an accented label would shift them -- the chain keeps the
+-- dim-label/bright-value contrast without that trap.
+--
+-- TWEAK: everything on this row shares PEAKS_ZOOM. It has to: the English line measures
+-- 110px of the card's 118 at 0.34, so the figures cannot be set at the 0.46 the other
+-- rows use for their values. Raising it means shortening the labels.
+local PEAKS_ZOOM = 0.34
+local PEAKS_PARTS = { "Label1", "Value1", "Sep", "Label2", "Value2" }
+
+local peaks = Def.ActorFrame{
+	Name="EventPeaks",
+	InitCommand=function(self) self:visible(false) end,
+
+	RefreshCommand=function(self)
+		local index, count, event = CompositeRow()
+		if not index or not event then self:visible(false) return end
+
+		local best = SRPGProfileStats(player, event)
+		if not best then self:visible(false) return end
+
+		local meter, bpm = SRPGPassedPeaks(player, event)
+
+		-- The separators live here rather than in the language files, which trim
+		-- surrounding whitespace out of their values.
+		self:GetChild("Label1"):settext( THEME:GetString("ScreenSelectMusic", "SrpgHighestLevel") .. " : " )
+		self:GetChild("Value1"):settext( meter and tostring(meter) or "--" )
+		self:GetChild("Sep"):settext("  |  ")
+		self:GetChild("Label2"):settext( THEME:GetString("ScreenSelectMusic", "SrpgHighestBpm") .. " : " )
+		self:GetChild("Value2"):settext( bpm and ("%.0f BPM"):format(bpm) or "-- BPM" )
+
+		-- Chain them left to right off their own drawn widths, so the line closes up
+		-- around a one-digit level or a four-digit bpm instead of sitting on fixed anchors.
+		local x = -W/2 + PAD
+		for _, name in ipairs(PEAKS_PARTS) do
+			local part = self:GetChild(name)
+			part:x(x)
+			x = x + part:GetZoomedWidth()
+		end
+
+		self:visible(true):y( RowY(index, count) )
+	end,
+}
+
+for _, name in ipairs(PEAKS_PARTS) do
+	local bright = (name:match("^Value") ~= nil)
+
+	peaks[#peaks+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+		Name=name,
+		Text="",
+		InitCommand=function(self)
+			self:horizalign(left):zoom(PEAKS_ZOOM)
+			self:diffuse( bright and HUD_TEXT or HUD_LABEL )
+		end
+	}
+end
+
+af[#af+1] = peaks
 
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
