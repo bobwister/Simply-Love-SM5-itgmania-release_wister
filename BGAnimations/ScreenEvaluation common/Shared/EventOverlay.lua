@@ -18,7 +18,22 @@ local SetRpgStyle = function(eventAf)
 	eventAf:GetChild("HeaderBorder"):diffuse(RpgYellow)
 	
 	local idx = SL.Global.ActiveColorIndex
-	local faction_name = SL.SRPG9.GetFactionName(idx)
+
+	-- SL.SRPG9 does not exist in this theme and never has: the only event module defined is
+	-- SL.SRPG8, in Scripts/SL_SRPG6.lua (yes, the file and the table disagree -- that is
+	-- upstream's naming, left alone). Reading SL.SRPG9.GetFactionName therefore indexed a
+	-- nil field and threw on EVERY RPG pane, since both pane builders below call this
+	-- function as their first statement.
+	--
+	-- And it threw *here*, four lines after the background, the tint and the borders had
+	-- already been switched on individually -- so the pane appeared as a bordered, empty
+	-- frame with a working dismiss prompt and no header, no body text and no leaderboard.
+	-- That is the "modal that asks you to confirm but shows nothing" symptom exactly.
+	--
+	-- Guarded rather than merely repointed, so that renaming or dropping the module again
+	-- costs a neutral header colour instead of the whole overlay.
+	local module = SL.SRPG8
+	local faction_name = module and module.GetFactionName and module.GetFactionName(idx) or ""
 
 	if faction_name == "Stamina Nation" then
 		eventAf:GetChild("HeaderBackground")
@@ -851,9 +866,14 @@ for player in ivalues(PlayerNumber) do
 		},
 
 		-- Main Black cement background
+		--
+		-- Was _VisualStyles/SRPG9/Overlay-BG.png, a second dangling SRPG9 reference:
+		-- Graphics/_VisualStyles/ has no SRPG9 directory at all, only SRPG8, and the file
+		-- there is a .jpg. The extension is left off so GetPathG resolves whichever it
+		-- finds, rather than pinning this to one container format.
 		Def.Sprite {
 			Name="BackgroundImage",
-			Texture=THEME:GetPathG("", "_VisualStyles/SRPG9/Overlay-BG.png"),
+			Texture=THEME:GetPathG("", "_VisualStyles/SRPG8/Overlay-BG"),
 			InitCommand=function(self)
 				self:CropTo(paneWidth, paneHeight)
 			end

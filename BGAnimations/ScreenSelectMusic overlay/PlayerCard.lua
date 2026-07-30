@@ -311,13 +311,42 @@ end
 
 af[#af+1] = peaks
 
+-- The rule between the two blocks, captioned at its left end.
+--
+-- The caption matters more than it looks: everything BELOW this rule is profile-wide, not
+-- event-scoped. StarCountsCompute walks SONGMAN:GetAllSongs() -- the whole installed
+-- library, filtered only by the current style -- and the cleared count comes off that same
+-- walk. Sitting under an "SRPG"-headed block, those figures read as SRPG figures, which
+-- they are not. (The quint tier is a third thing again: it is counted from the ITL hashMap,
+-- so it is neither library-wide nor SRPG.) Labelling was chosen over rescoping them.
+--
+-- TWEAK: CAPTION_W is the space reserved for the caption; the rule takes what is left.
+-- A caption row of its own would not fit -- the two star rows already touch at y 61 and
+-- the card ends 5px below the second, so this rides the rule instead.
+local CAPTION_ZOOM = 0.28
+local CAPTION_W    = 46
+local CAPTION_GAP  = 4
+
 af[#af+1] = Def.Quad{
 	InitCommand=function(self)
-		self:zoomto(W - PAD*2, 1):y(RULE_Y)
+		self:horizalign(left)
+		self:zoomto(W - PAD*2 - CAPTION_W - CAPTION_GAP, 1)
+		self:xy(ITL_LABEL_X + CAPTION_W + CAPTION_GAP, RULE_Y)
 		self:playcommand("Paint")
 	end,
 	PaintCommand=function(self) self:diffuse( DimColor(Accent(), 1.0, 0.20) ) end,
 	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
+}
+
+af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+	Name="ScopeCaption",
+	Text=THEME:GetString("ScreenSelectMusic", "PlayerCardAllSongs"),
+	InitCommand=function(self)
+		self:horizalign(left):zoom(CAPTION_ZOOM)
+		self:xy(ITL_LABEL_X, RULE_Y)
+		self:maxwidth(CAPTION_W / CAPTION_ZOOM)
+		self:diffuse(HUD_LABEL)
+	end,
 }
 
 -- Left edge and centre line of grid slot `slot` (1..6), in reading order.

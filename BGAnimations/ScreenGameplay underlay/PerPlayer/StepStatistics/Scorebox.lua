@@ -10,11 +10,34 @@ end
 local n = player==PLAYER_1 and "1" or "2"
 local IsUltraWide = (GetScreenAspectRatio() > 21/9)
 local NoteFieldIsCentered = (GetNotefieldX(player) == _screen.cx)
-local NumEntries = 5
+-- Eight dense rows, matched to the song wheel's own scorebox
+-- (BGAnimations/ScreenSelectMusic overlay/PerPlayer/Scorebox.lua) and to LocalLeaderboard,
+-- so one leaderboard reads the same on both screens instead of being five large rows here
+-- and eight small ones there. Both cards are 80px tall, so the metrics port straight over.
+local NumEntries = 8
 
-local border = 5
+-- A hairline, not the old 5px slab: the HUD idiom carries a panel edge as a thin rule and
+-- lets the fill do the work. It still takes the per-style colour, which is load-bearing --
+-- that colour is what says whether you are looking at GrooveStats, SRPG or ITL.
+local border = 2
 local width = 162
 local height = 80
+
+-- A Miso line's visible band at 0.55 is 8.25px, leaving ~1.8px of leading in a 10px row.
+local row_zoom = 0.55
+local ROW_H    = height / NumEntries
+
+-- Column anchors from the card's centre, replacing the raw "-width/2 + 27" literals that
+-- used to sit inline in every row actor.
+local RANK_X  = -width/2 + 18   -- right-aligned
+local NAME_X  = -width/2 + 21   -- left-aligned
+local SCORE_X =  width/2 - 3    -- right-aligned
+local CROWN_X = -width/2 + 10
+
+-- maxwidth is in UNZOOMED font units, so the screen budget is divided by the zoom.
+-- SCORE_PX is the room kept clear for the widest score string at row_zoom.
+local SCORE_PX = 34
+local NAME_MAXWIDTH = ((SCORE_X - SCORE_PX) - NAME_X) / row_zoom
 
 local cur_style = 0
 local num_styles = 4
@@ -418,13 +441,19 @@ local af = Def.ActorFrame{
 			self:linear(transition_seconds):diffuse(style_color[cur_style])
 		end
 	},
-	-- Main body
+	-- Main body, in the shared HUD panel ink rather than pure black, so this card matches
+	-- the ones down the left column of the song wheel. HUDPanel applies both the colour and
+	-- the alpha (Scripts/SL-Helpers-WheelPlate.lua).
 	Def.Quad{
 		Name="Background",
 		InitCommand=function(self)
-			self:diffuse(color("#000000")):setsize(width, height)
+			HUDPanel(self):setsize(width, height)
 		end,
 	},
+
+	-- Corner brackets: the device that marks a panel as a HUD card everywhere else in the
+	-- theme. Repaints itself on ColorSelected, like every other HUDCardDecor.
+	HUDCardDecor(width, height, 0, 0)..{ Name="CardDecor" },
 	-- GrooveStats Logo
 	Def.Sprite{
 		Texture=THEME:GetPathG("", "GrooveStats.png"),
@@ -494,8 +523,28 @@ local af = Def.ActorFrame{
 }
 
 for i=1,NumEntries do
-	local y = -height/2 + 16 * i - 8
-	local zoom = 0.87
+	local y = -height/2 + ROW_H*i - ROW_H/2
+	local zoom = row_zoom
+
+	-- Band marking your own entry. Eight rows leave no headroom for a header, so "which row
+	-- is me" is carried by a filled band behind the row rather than by a label -- the same
+	-- device the wheel's scorebox uses, reading the same isSelf flag as the text below.
+	af[#af+1] = Def.Quad{
+		Name="SelfBand"..i,
+		InitCommand=function(self)
+			self:setsize(width - 4, ROW_H - 1):xy(0, y)
+			self:diffuse(self_color):diffusealpha(0)
+		end,
+		LoopScoreboxCommand=function(self)
+			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
+		end,
+		SetScoreboxCommand=function(self)
+			local score = all_data[cur_style+1]["scores"][i]
+			if score.isSelf then
+				self:linear(transition_seconds/2):diffusealpha(0.16)
+			end
+		end
+	}
 
 	-- Rank 1 gets a crown.
 	if i == 1 then
@@ -503,7 +552,7 @@ for i=1,NumEntries do
 			Name="Rank"..i,
 			Texture=THEME:GetPathG("", "crown.png"),
 			InitCommand=function(self)
-				self:zoom(0.09):xy(-width/2 + 14, y):diffusealpha(0)
+				self:zoomto(ROW_H - 2, ROW_H - 2):xy(CROWN_X, y):diffusealpha(0)
 			end,
 			LoopScoreboxCommand=function(self)
 				self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
@@ -520,14 +569,14 @@ for i=1,NumEntries do
 			Name="Rank"..i,
 			Text="",
 			InitCommand=function(self)
-				self:diffuse(Color.White):xy(-width/2 + 27, y):maxwidth(30):horizalign(right):zoom(zoom)
+				self:diffuse(HUD_LABEL):xy(RANK_X, y):maxwidth(30):horizalign(right):zoom(zoom)
 			end,
 			LoopScoreboxCommand=function(self)
 				self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 			end,
 			SetScoreboxCommand=function(self)
 				local score = all_data[cur_style+1]["scores"][i]
-				local clr = Color.White
+				local clr = HUD_LABEL
 				if score.isSelf then
 					clr = self_color
 				elseif score.isRival then
@@ -543,14 +592,14 @@ for i=1,NumEntries do
 		Name="Name"..i,
 		Text="",
 		InitCommand=function(self)
-			self:diffuse(Color.White):xy(-width/2 + 30, y):maxwidth(100):horizalign(left):zoom(zoom)
+			self:diffuse(HUD_TEXT):xy(NAME_X, y):maxwidth(NAME_MAXWIDTH):horizalign(left):zoom(zoom)
 		end,
 		LoopScoreboxCommand=function(self)
 			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 		end,
 		SetScoreboxCommand=function(self)
 			local score = all_data[cur_style+1]["scores"][i]
-			local clr = Color.White
+			local clr = HUD_TEXT
 			if score.isSelf then
 				clr = self_color
 			elseif score.isRival then
@@ -565,14 +614,14 @@ for i=1,NumEntries do
 		Name="Score"..i,
 		Text="",
 		InitCommand=function(self)
-			self:diffuse(Color.White):xy(-width/2 + 160, y):horizalign(right):zoom(zoom)
+			self:diffuse(HUD_TEXT):xy(SCORE_X, y):horizalign(right):zoom(zoom)
 		end,
 		LoopScoreboxCommand=function(self)
 			self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")
 		end,
 		SetScoreboxCommand=function(self)
 			local score = all_data[cur_style+1]["scores"][i]
-			local clr = Color.White
+			local clr = HUD_TEXT
 			if score.isFail then
 				clr = Color.Red
 			elseif score.isEx then

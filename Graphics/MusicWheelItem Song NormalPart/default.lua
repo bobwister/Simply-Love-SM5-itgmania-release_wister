@@ -68,7 +68,27 @@ local function GetItgPercentForSong(player, song)
 	local scores = list:GetHighScores()
 	if not scores or #scores == 0 then return nil end
 
-	return scores[1]:GetPercentDP() * 100
+	-- The best PASSING score, not scores[1].
+	--
+	-- A failed run is still written to the high score list, so taking the top entry showed
+	-- a bailed attempt as the song's score -- right next to the clear lamp, which is
+	-- simultaneously reporting that same run as a failure. This profile currently holds
+	-- five such entries (three at 0.00% on 3y3s, plus Esperanza, Anubis, Nocturne and one
+	-- 39.70% on Young Birds), every one of which printed as that song's ITG score.
+	--
+	-- The list's own order is not something to lean on here either: it ranks by score, so
+	-- a high-percentage fail can sit above a genuine lower pass.
+	--
+	-- nil when nothing has been passed, which hides the column -- the same as never having
+	-- played the chart. An unfinished run is not a score.
+	local best = nil
+	for score in ivalues(scores) do
+		if score:GetGrade() ~= "Grade_Failed" then
+			local pct = score:GetPercentDP() * 100
+			if best == nil or pct > best then best = pct end
+		end
+	end
+	return best
 end
 
 if ThemePrefs.Get("SongSelectBG") ~= "Off" then
