@@ -12,45 +12,25 @@
 -- scroll back and forth over the same packs, costs a table lookup.
 --
 -- What counts as cleared is what the FolderStats panel and the star tally already count:
--- a best score exists on the chart and its grade isn't Grade_Failed.
+-- a best score exists on the chart and its grade isn't Grade_Failed -- or a score for it
+-- was imported from GrooveStats, which only ever happens for a run that was passed.
 
 -- Keyed by profile GUID as well as by group, so swapping profiles misses the cache
 -- rather than needing anyone to remember to clear it.
 local cache = {}
 
--- Grade tier -> star count, best first. Grade_Tier01 IS the four-star grade in Simply
--- Love (see the GradePercentTier comments in Metrics.ini), so the buckets run 4..1 and
--- leave 5 for the quint.
-local STAR_TIER = {
-	Grade_Tier01 = 4,
-	Grade_Tier02 = 3,
-	Grade_Tier03 = 2,
-	Grade_Tier04 = 1,
-}
-
--- Did this profile quint (ITL FFPC) this song?
---
--- It matters because a quint also grades as four stars: counted naively it would land in
--- BOTH the five- and four-star buckets. The player card's tally has that older behaviour
--- -- its quint count comes from ITL data while its tiers come from a separate profile
--- walk -- and double-counts. This does not.
---
--- ITL-only by nature: outside an ITL pack there is no hash and the answer is false, which
--- is correct rather than merely convenient. Nothing else can tell a quint from a quad.
-local function IsQuint(pn, song)
-	local data = SL[pn].ITLData
-	if not data or not data["pathMap"] or not data["hashMap"] then return false end
-
-	local hash = data["pathMap"][ song:GetSongDir() ]
-	if not hash then return false end
-
-	local entry = data["hashMap"][hash]
-	return entry ~= nil and entry["clearType"] == 5
-end
+-- Grade tier -> star count and the quint test both live in Scripts/SL-Helpers-StarCounts
+-- .lua, and are shared rather than repeated here so this panel and the player card's tally
+-- cannot drift apart. A quint outranks the quad it also grades as, and replaces it rather
+-- than adding to it, in both places.
 
 -- Scores earned since the cache was filled won't be in it. Difficulty and profile are
--- both part of the key, so the only event that can stale an entry is the player actually
--- passing something -- which means one call on entry to ScreenSelectMusic covers it.
+-- both part of the key, so the events that can stale an entry are the player passing
+-- something -- which always comes back through this screen -- and a score arriving from
+-- GrooveStats while browsing. The latter is deliberately NOT invalidated on arrival: an
+-- import lands every time a new song is selected, and re-walking the pack that often is
+-- exactly the cost this cache exists to avoid. Such a score joins the count on the next
+-- entry to the screen. So one call on entry to ScreenSelectMusic covers it.
 -- That call lives at file scope in BGAnimations/ScreenSelectMusic overlay/default.lua,
 -- where it runs once per screen load, before any row has been Set.
 FolderProgressInvalidate = function()
@@ -94,6 +74,12 @@ FolderProgressGet = function(player, group)
 	local cleared, total = 0, 0
 	local tiers = { 0, 0, 0, 0, 0 }
 
+	-- Tested once rather than per chart: on a profile that has never imported anything the
+	-- lookup below would otherwise build a key string for every chart in the pack only to
+	-- miss.
+	local store = SL[pn].OnlineScores
+	local has_online = store ~= nil and next(store) ~= nil
+
 	for song in ivalues(SONGMAN:GetSongsInGroup(group)) do
 		-- One engine-side lookup, rather than pulling the song's whole steps table into
 		-- Lua and filtering it here the way the old row code did once per song.
@@ -102,6 +88,9 @@ FolderProgressGet = function(player, group)
 		if chart then
 			total = total + 1
 
+			local passed = false
+			local tier = nil
+
 			local list = profile:GetHighScoreListIfExists(song, chart)
 			if list then
 				local scores = list:GetHighScores()
@@ -109,13 +98,31 @@ FolderProgressGet = function(player, group)
 					local grade = scores[1]:GetGrade()
 
 					if grade ~= "Grade_Failed" then
-						cleared = cleared + 1
-
-						-- quint first, so it isn't also counted as the quad it grades as
-						local tier = IsQuint(pn, song) and 5 or STAR_TIER[grade]
-						if tier then tiers[tier] = tiers[tier] + 1 end
+						passed = true
+						tier = StarsForGrade(grade)
 					end
 				end
+			end
+
+			-- A score is only ever imported for a run that was passed, so the presence of
+			-- an entry IS the clear, and its percentage gives the tier the same way a
+			-- local grade does.
+			if has_online then
+				local entry = OnlineScoreGet(player, song, chart)
+				if entry then
+					passed = true
+					local stars = StarsForPercent(entry.itg)
+					if stars and (tier == nil or stars > tier) then tier = stars end
+					if type(entry.ex) == "number" and entry.ex >= 100 then tier = 5 end
+				end
+			end
+
+			if passed then
+				cleared = cleared + 1
+
+				-- quint last, so it isn't also counted as the quad it grades as
+				if IsQuintSong(pn, song) then tier = 5 end
+				if tier then tiers[tier] = tiers[tier] + 1 end
 			end
 		end
 	end

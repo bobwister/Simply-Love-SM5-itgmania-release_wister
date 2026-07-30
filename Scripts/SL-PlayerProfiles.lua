@@ -237,6 +237,7 @@ LoadProfileCustom = function(profile, dir)
 		-- Must come after initialize(), which would wipe the table it fills -- the same
 		-- ordering ReadItlFile above depends on.
 		ExScoresRead(player)
+		OnlineScoresRead(player)
 
 		SL[pn].Stages = stages
 	end
@@ -322,6 +323,8 @@ SaveProfileCustom = function(profile, dir)
 			-- Same deal for the theme-wide EX scores, which are recorded per stage into
 			-- SL[pn].ExScores and only reach disk here.
 			ExScoresWrite(player)
+			-- Scores imported from GrooveStats while browsing the wheel.
+			OnlineScoresWrite(player)
 			break
 		end
 	end

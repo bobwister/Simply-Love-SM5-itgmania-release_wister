@@ -42,9 +42,15 @@ local function GetLamp(song)
 	
 	local profile = PROFILEMAN:GetProfile(player)
 	local high_score_list = profile:GetHighScoreListIfExists(song, steps)
-			
+
 	-- If no scores then just return.
 	if high_score_list == nil or #high_score_list:GetHighScores() == 0 then
+		-- ...unless GrooveStats has one for this chart. A score is only ever imported for
+		-- a run that was passed, so it earns the plain blue clear lamp (51). It cannot
+		-- earn any of the coloured ones: those grade how deep a full combo went, which is
+		-- read off the StageAward, and a leaderboard entry carries no judgment breakdown
+		-- at all -- only a rank, a name, a percentage and isFail.
+		if OnlineScorePassed(player, song, steps) then return 51 end
 		return nil
 	end
 
@@ -90,6 +96,13 @@ local function GetLamp(song)
 			if score:GetGrade() == "Grade_Failed" then best_lamp = 52
 			else best_lamp = 51 end
 		end
+	end
+
+	-- A pass imported from GrooveStats outranks a local fail: the chart HAS been cleared,
+	-- just not on this machine. Same rule the row's ITG percentage follows. It cannot
+	-- promote past the plain blue lamp for the reason given above.
+	if best_lamp == 52 and OnlineScorePassed(player, song, steps) then
+		return 51
 	end
 
 	return best_lamp,tap_count

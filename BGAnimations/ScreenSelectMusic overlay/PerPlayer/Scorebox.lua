@@ -256,6 +256,39 @@ local LeaderboardRequestProcessor = function(res, master)
 		all_data[1].has_data = false
 		all_data[2].has_data = false
 		
+		-- Keep the player's own online score for this chart, when the operator has left
+		-- Auto-Download Online Scores on. This rides the request the scorebox was making
+		-- anyway rather than issuing one of its own, which is the whole reason importing is
+		-- affordable at all: player-leaderboards.php takes one chart hash per request, and a
+		-- hash costs a full simfile parse, so sweeping a library was never viable.
+		--
+		-- Exactness is already guaranteed above: this code is unreachable unless the
+		-- response's chartHash equals the locally parsed one (see the early return), which
+		-- is what stops two different charts that merely share a title being confused.
+		local capture_song  = GAMESTATE:GetCurrentSong()
+		local capture_steps = GAMESTATE:GetCurrentSteps(player)
+		local capture_hash  = data[playerStr]["chartHash"]
+
+		local Capture = function(field)
+			if not ThemePrefs.Get("AutoDownloadScores") then return nil end
+			if not capture_song or not capture_steps then return nil end
+			if not PROFILEMAN:IsPersistentProfile(player) then return nil end
+
+			return function(entry)
+				-- A failed run is not a score. Same rule the local EX store and the wheel's
+				-- ITG column follow, so nothing on that row disagrees about what counts.
+				if entry["isFail"] then return end
+
+				local raw = tonumber(entry["score"])
+				if not raw then return end
+
+				-- The API sends hundredths (9823), the store keeps percent (98.23).
+				if OnlineScoreRecord(player, capture_song, capture_steps, field, raw/100, capture_hash) then
+					OnlineScoresWrite(player)
+				end
+			end
+		end
+
 		local showITG = SL["P"..n].ActiveModifiers.SBITGScore
 		local showEX = SL["P"..n].ActiveModifiers.SBEXScore
 		local showEvents = SL["P"..n].ActiveModifiers.SBEvents
@@ -266,26 +299,26 @@ local LeaderboardRequestProcessor = function(res, master)
 			-- If the player is using EX scoring, then we want to display the EX leaderboard first.		
 			if showEX then
 				if data[playerStr]["exLeaderboard"] then
-					FillBoard(1, data[playerStr]["exLeaderboard"], true)
+					FillBoard(1, data[playerStr]["exLeaderboard"], true, Capture("ex"))
 				end
 			end
 
 			if showITG then
 				if data[playerStr]["gsLeaderboard"] then
-					FillBoard(2, data[playerStr]["gsLeaderboard"], boogie_ex)
+					FillBoard(2, data[playerStr]["gsLeaderboard"], boogie_ex, Capture("itg"))
 				end
 			end
 		else
 			-- Display the main GrooveStats leaderboard first if player is not using EX scoring.
 			if showITG then
 				if data[playerStr]["gsLeaderboard"] then
-					FillBoard(1, data[playerStr]["gsLeaderboard"], boogie_ex)
+					FillBoard(1, data[playerStr]["gsLeaderboard"], boogie_ex, Capture("itg"))
 				end
 			end
 
 			if showEX then
 				if data[playerStr]["exLeaderboard"] then
-					FillBoard(2, data[playerStr]["exLeaderboard"], true)
+					FillBoard(2, data[playerStr]["exLeaderboard"], true, Capture("ex"))
 				end
 			end
 		end

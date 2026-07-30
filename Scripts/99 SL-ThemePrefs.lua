@@ -316,6 +316,15 @@ SL_CustomPrefs.Get = function()
 			Values  = { true, false }
 		},
 
+		-- Keep the player's GrooveStats score for a chart when the wheel fetches its
+		-- leaderboard anyway, so a score set on another machine still shows here. Costs no
+		-- extra request: it rides the one the scorebox/pane already sends on song select.
+		AutoDownloadScores = {
+			Default = true,
+			Choices =  { THEME:GetString("ThemePrefs","Yes"), THEME:GetString("ThemePrefs", "No") },
+			Values  = { true, false }
+		},
+
 		SeparateUnlocksByPlayer = {
 			Default = false,
 			Choices =  { THEME:GetString("ThemePrefs","Yes"), THEME:GetString("ThemePrefs", "No") },

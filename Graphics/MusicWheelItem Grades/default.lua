@@ -97,6 +97,61 @@ end
 -- assign the "Grade_Failed" key a value equal to num_tiers
 grades["Grade_Failed"] = num_tiers
 
+-- The chart this row would be played on, at the difficulty currently selected.
+--
+-- Needed because the engine hands the two halves of a row's identity to two different
+-- messages: "SetGrade" carries the grade but no song, "Set" carries the song but no grade.
+local function ChartForRow(song)
+	if not song or player == nil then return nil end
+
+	local steps = GAMESTATE:GetCurrentSteps(player)
+	local style = GAMESTATE:GetCurrentStyle()
+	if not steps or not style then return nil end
+
+	return song:GetOneSteps(style:GetStepsType(), steps:GetDifficulty())
+end
+
+-- Decide the sprite's state from whichever of the two messages arrived last.
+--
+-- Both always arrive, in the same call, but NOT in a fixed order: MusicWheelItem.cpp
+-- sends "SetGrade" before "Set" when a row is first loaded (RefreshGrades at line 230,
+-- the Set message at 331) and after it when the selected steps change (line 499-500).
+-- So each message stores its own half and re-runs this, and the second one to land
+-- settles it correctly whichever that turns out to be.
+local function Decide(self)
+	local state = nil
+	if self.grade then state = grades[self.grade] end
+
+	-- No local grade means the engine has never seen this chart played here; a local
+	-- Grade_Failed means it has, and it didn't go well. A score imported from GrooveStats
+	-- answers both: stars are a function of the ITG percentage and nothing else, so the
+	-- tier it earns is the tier it earns, and a pass somewhere outranks a fail here --
+	-- which is the rule the row's own ITG percentage already follows.
+	if (state == nil or self.grade == "Grade_Failed") and player ~= nil then
+		local chart = ChartForRow(self.song)
+		local grade = chart and GradeFromPercent(OnlineScoreField(player, self.song, chart, "itg"))
+		if grade then state = grades[grade] end
+	end
+
+	if state == nil then
+		self:visible(false)
+		return
+	end
+
+	-- The quint icon replaces the grade rather than sitting beside it, so it has the last
+	-- word. Checked here rather than trusted to ordering: on a row's first load "SetGrade"
+	-- arrives before "Set", so this can run while the Quint sprite still shows the
+	-- PREVIOUS row's answer -- but its own SetCommand follows and settles both.
+	local quint = self:GetParent() and self:GetParent():GetChild("Quint")
+	if quint and quint:GetVisible() then
+		self:visible(false)
+		return
+	end
+
+	self:visible(true)
+	self:setstate(state)
+end
+
 return Def.ActorFrame{
 	Def.Sprite{
 		Name="Grades",
@@ -111,20 +166,19 @@ return Def.ActorFrame{
 		--     Grade (GradeTier as number)
 		--     NumTimesPlayed (number)
 		SetGradeCommand=function(self, params)
-			if not (params.Grade and grades[params.Grade]) then
-				self:visible(false)
-				return
-			end
-			
 			if params.PlayerNumber ~= nil then
 				player=params.PlayerNumber
 				pn=ToEnumShortString(params.PlayerNumber)
 			end
 
-			self:setstate(grades[params.Grade])
+			self.grade = params.Grade
+			Decide(self)
 		end,
-		
-		
+
+		SetCommand=function(self, params)
+			self.song = params.Song
+			Decide(self)
+		end,
 	},
 	
 	Def.Sprite{
@@ -134,9 +188,21 @@ return Def.ActorFrame{
 		SetCommand=function(self, params)
 			if not params.Song then return end
 			if pn == nil then return end
-			
+
 			local lamp = GetLamp(params.Song)
-			if lamp == 0 then
+
+			-- An imported EX of 100.00 means every note was a white fantastic, which is a
+			-- quint. It is the one thing a bare percentage can prove about a judgment
+			-- breakdown, and only because the perfect score has exactly one preimage --
+			-- nothing short of 100.00 implies anything of the sort.
+			local quinted = (lamp == 0)
+			if not quinted then
+				local chart = ChartForRow(params.Song)
+				local ex = chart and OnlineScoreField(player, params.Song, chart, "ex")
+				quinted = (type(ex) == "number" and ex >= 100)
+			end
+
+			if quinted then
 				self:visible(true)
 				self:GetParent():GetChild("Grades"):visible(false)
 			else

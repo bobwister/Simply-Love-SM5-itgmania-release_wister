@@ -37,12 +37,6 @@ local ITL_BLOCK_LEFT = ITL_COL_PTS - 40
 -- treatment already used on the evaluation screen.
 local ITL_LABEL_COLOR = color("#5A6166")
 
--- Best ITG percent this profile holds on a row's song, for the difficulty
--- currently selected on the wheel. The wheel only tracks one difficulty at a
--- time, so a row's score is the score on that difficulty's chart -- the same
--- resolution GetLamp.lua does for the clear lamp, and the same per-row profile
--- lookup cost. Returns nil when there is no profile, no matching chart, or no
--- score recorded.
 -- The chart a wheel row resolves to: this row's song, at the difficulty and steps type the
 -- player currently has selected. Shared by the ITG score column and the EX one below, so
 -- the two can never end up describing different charts on the same row.
@@ -63,6 +57,11 @@ local function StepsForRow(player, song)
 	return nil
 end
 
+-- Best ITG percent for a row's song at the difficulty currently selected on the wheel,
+-- taking the better of the profile's own passing scores and anything imported from
+-- GrooveStats. The wheel only tracks one difficulty at a time, so a row's score is the
+-- score on that difficulty's chart -- the same resolution GetLamp.lua does for the clear
+-- lamp. Returns nil when there is no profile, no matching chart, or nothing recorded.
 local function GetItgPercentForSong(player, song)
 	if not song then return nil end
 	if not PROFILEMAN:IsPersistentProfile(player) then return nil end
@@ -70,11 +69,13 @@ local function GetItgPercentForSong(player, song)
 	local steps = StepsForRow(player, song)
 	if not steps then return nil end
 
+	-- NOT an early return when there is no local list. A chart you have never played on
+	-- this machine is exactly the case an imported GrooveStats score exists to cover, so the
+	-- local lookup has to be allowed to come back empty and still fall through to the
+	-- online one below.
+	local scores = nil
 	local list = PROFILEMAN:GetProfile(player):GetHighScoreListIfExists(song, steps)
-	if not list then return nil end
-
-	local scores = list:GetHighScores()
-	if not scores or #scores == 0 then return nil end
+	if list then scores = list:GetHighScores() end
 
 	-- The best PASSING score, not scores[1].
 	--
@@ -90,12 +91,20 @@ local function GetItgPercentForSong(player, song)
 	-- nil when nothing has been passed, which hides the column -- the same as never having
 	-- played the chart. An unfinished run is not a score.
 	local best = nil
-	for score in ivalues(scores) do
+	for score in ivalues(scores or {}) do
 		if score:GetGrade() ~= "Grade_Failed" then
 			local pct = score:GetPercentDP() * 100
 			if best == nil or pct > best then best = pct end
 		end
 	end
+
+	-- Then the score imported from GrooveStats, if the player has one there. The better of
+	-- the two wins, which is how a score set on another machine reaches this row: the theme
+	-- cannot write into the profile's own high scores at all, so the two stores are merged
+	-- here at draw time instead. See Scripts/SL-Helpers-OnlineScores.lua.
+	local online = OnlineScoreField(player, song, steps, "itg")
+	if online and (best == nil or online > best) then best = online end
+
 	return best
 end
 
@@ -249,8 +258,14 @@ for player in ivalues(PlayerNumber) do
 				-- what makes the column appear on every song rather than only inside an ITL
 				-- pack; see Scripts/SL-Helpers-ExScores.lua for why it has to be recorded at
 				-- play time instead of derived from the saved score here.
+				-- Two sources, better wins: the EX this theme recorded when you played the
+				-- chart here, and the EX imported from GrooveStats for a run you set
+				-- elsewhere. Both are keyed the same way, so this costs one extra table
+				-- lookup per row.
 				local steps = StepsForRow(owner, song)
 				local ex = steps and ExScoreGet(owner, song, steps)
+				local online_ex = steps and OnlineScoreField(owner, song, steps, "ex")
+				if online_ex and (ex == nil or online_ex > ex) then ex = online_ex end
 				if ex then
 					local val = ("%.2f"):format(ex)
 					self:settext(val .. " EX")

@@ -317,8 +317,9 @@ af[#af+1] = peaks
 -- event-scoped. StarCountsCompute walks SONGMAN:GetAllSongs() -- the whole installed
 -- library, filtered only by the current style -- and the cleared count comes off that same
 -- walk. Sitting under an "SRPG"-headed block, those figures read as SRPG figures, which
--- they are not. (The quint tier is a third thing again: it is counted from the ITL hashMap,
--- so it is neither library-wide nor SRPG.) Labelling was chosen over rescoping them.
+-- they are not. (The quint tier is narrower still: only ITL data can tell a quint from the
+-- quad it grades as, so that bucket only ever fills on ITL charts.) Labelling was chosen
+-- over rescoping them.
 --
 -- TWEAK: CAPTION_W is the space reserved for the caption; the rule takes what is left.
 -- A caption row of its own would not fit -- the two star rows already touch at y 61 and
