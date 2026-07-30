@@ -98,6 +98,10 @@ for player in ivalues(Players) do
 	-- Generate the .rpg file for the player to keep track of best rate mod on the songwheel
 	-- When the event isn't active, this actor is nil.
 	t[#t+1] = LoadActor("./PerPlayer/RpgRatemod.lua", player)
+
+	-- Record this stage's EX score into the profile, for every chart rather than only ITL
+	-- ones, so the song wheel can show an EX on any row. Not gated on any event.
+	t[#t+1] = LoadActor("./PerPlayer/ExScoreFile.lua", player)
 	
 	
 end

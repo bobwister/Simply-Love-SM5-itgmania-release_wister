@@ -43,9 +43,11 @@ local ITL_LABEL_COLOR = color("#5A6166")
 -- resolution GetLamp.lua does for the clear lamp, and the same per-row profile
 -- lookup cost. Returns nil when there is no profile, no matching chart, or no
 -- score recorded.
-local function GetItgPercentForSong(player, song)
+-- The chart a wheel row resolves to: this row's song, at the difficulty and steps type the
+-- player currently has selected. Shared by the ITG score column and the EX one below, so
+-- the two can never end up describing different charts on the same row.
+local function StepsForRow(player, song)
 	if not song then return nil end
-	if not PROFILEMAN:IsPersistentProfile(player) then return nil end
 
 	local curSteps = GAMESTATE:GetCurrentSteps(player)
 	if not curSteps then return nil end
@@ -53,13 +55,19 @@ local function GetItgPercentForSong(player, song)
 	local difficulty = curSteps:GetDifficulty()
 	local steps_type = GAMESTATE:GetCurrentStyle():GetStepsType()
 
-	local steps = nil
 	for check in ivalues(song:GetAllSteps()) do
 		if check:GetDifficulty() == difficulty and check:GetStepsType() == steps_type then
-			steps = check
-			break
+			return check
 		end
 	end
+	return nil
+end
+
+local function GetItgPercentForSong(player, song)
+	if not song then return nil end
+	if not PROFILEMAN:IsPersistentProfile(player) then return nil end
+
+	local steps = StepsForRow(player, song)
 	if not steps then return nil end
 
 	local list = PROFILEMAN:GetProfile(player):GetHighScoreListIfExists(song, steps)
@@ -182,6 +190,10 @@ for player in ivalues(PlayerNumber) do
 			-- Only display EX score if a profile is found for an enabled player.
 			local pn = ToEnumShortString(player)
 
+			-- Kept for the difficulty-change replays below. Stored ahead of the early
+			-- returns, so a row that bails out still knows its song next time.
+			self.song = params and params.Song
+
 			if GAMESTATE:GetNumSidesJoined() == 1 then
 				-- Solo: only the P1 actor draws, reading from whichever side
 				-- actually holds the profile. Both actors used to render the same
@@ -206,6 +218,11 @@ for player in ivalues(PlayerNumber) do
 				self:y(player == PLAYER_1 and -10 or 10)
 			end
 
+			-- The PlayerNumber matching the pn resolved above. The solo branch picks pn by
+			-- which side actually holds the profile, which need not be this actor's own
+			-- `player`, and the lookups below take a PlayerNumber rather than a short name.
+			local owner = (pn == "P1") and PLAYER_1 or PLAYER_2
+
 			if params.Song ~= nil then
 				local song = params.Song
 				local song_dir = song:GetSongDir()
@@ -215,6 +232,10 @@ for player in ivalues(PlayerNumber) do
 						if SL[pn].ITLData["hashMap"][hash] ~= nil then
 							-- Always the EX score here; points now live in the dedicated,
 							-- rank-tier-colored points/rank subtitle line below.
+							--
+							-- ITL wins over the theme's own record when both exist: it is
+							-- the figure the event itself scored you on, and it is what the
+							-- points and rank on the same row were computed from.
 							local ex = ("%.2f"):format(SL[pn].ITLData["hashMap"][hash]["ex"] / 100)
 							self:settext(ex .. " EX")
 							self:AddAttribute(#ex, { Length=3, Diffuse=ITL_LABEL_COLOR })
@@ -223,8 +244,33 @@ for player in ivalues(PlayerNumber) do
 						end
 					end
 				end
+
+				-- No ITL entry, so fall back to the EX this theme recorded itself. This is
+				-- what makes the column appear on every song rather than only inside an ITL
+				-- pack; see Scripts/SL-Helpers-ExScores.lua for why it has to be recorded at
+				-- play time instead of derived from the saved score here.
+				local steps = StepsForRow(owner, song)
+				local ex = steps and ExScoreGet(owner, song, steps)
+				if ex then
+					local val = ("%.2f"):format(ex)
+					self:settext(val .. " EX")
+					self:AddAttribute(#val, { Length=3, Diffuse=ITL_LABEL_COLOR })
+					self:visible(true)
+					return
+				end
 			end
 			self:visible(false)
+		end,
+		-- The chart this column describes now depends on the selected difficulty, because
+		-- the fallback resolves a chart through StepsForRow. The ITL branch never needed
+		-- this -- its hashMap is keyed by song directory alone -- so the actor had no
+		-- refresh at all and would have kept showing the previous difficulty's EX.
+		-- Both sides are handled because solo can be played from either.
+		CurrentStepsP1ChangedMessageCommand=function(self)
+			self:playcommand("Set", { Song=self.song })
+		end,
+		CurrentStepsP2ChangedMessageCommand=function(self)
+			self:playcommand("Set", { Song=self.song })
 		end,
 	}
 	--[[ Song Rank (local top-N rank among this profile's ITL songs).
