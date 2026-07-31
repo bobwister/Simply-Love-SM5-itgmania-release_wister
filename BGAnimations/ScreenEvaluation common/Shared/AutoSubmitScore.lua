@@ -574,9 +574,9 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		
 		local p2pane = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("ScreenEval Common"):GetChild("Panes")
 		if GAMESTATE:IsSideJoined(PLAYER_2) then
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPanePrimary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPanePrimary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		else
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPaneSecondary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
 		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
 		self:sleep(0.1):queuecommand("SS")
@@ -586,9 +586,9 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		
 		local p2pane = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("ScreenEval Common"):GetChild("Panes")
 		if GAMESTATE:IsSideJoined(PLAYER_2) then
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPanePrimary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPanePrimary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		else
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPaneSecondary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
 		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
 		self:sleep(0.1):queuecommand("SS")
@@ -617,9 +617,9 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		
 		local p1pane = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("ScreenEval Common"):GetChild("Panes")
 		if GAMESTATE:IsSideJoined(PLAYER_1) then
-			p1pane:GetChild("Pane" .. SL["P1"].EvalPanePrimary .. "_SideP1"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p1pane:GetChild("Pane" .. (EvalPaneIndex("P1", SL["P1"].EvalPanePrimary) or 1) .. "_SideP1"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		else
-			p1pane:GetChild("Pane" .. SL["P1"].EvalPaneSecondary .. "_SideP1"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p1pane:GetChild("Pane" .. (EvalPaneIndex("P1", SL["P1"].EvalPaneSecondary) or 1) .. "_SideP1"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
 		p1pane:GetChild("Pane7_SideP1"):visible(true):sleep(0.2):diffusealpha(0)
 		self:sleep(0.1):queuecommand("SS")
@@ -629,9 +629,9 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		
 		local p2pane = SCREENMAN:GetTopScreen():GetChild("Overlay"):GetChild("ScreenEval Common"):GetChild("Panes")
 		if GAMESTATE:IsSideJoined(PLAYER_2) then
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPanePrimary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPanePrimary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		else
-			p2pane:GetChild("Pane" .. SL["P2"].EvalPaneSecondary .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
+			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
 		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
 		self:sleep(0.1):queuecommand("SS")

@@ -16,14 +16,18 @@ local players = GAMESTATE:GetHumanPlayers()
 
 local mpn = GAMESTATE:GetMasterPlayerNumber()
 
--- since we're potentially retrieving from player profile
--- perform some rudimentary validation by clamping both
--- values to be within permitted ranges
--- FIXME: num_panes won't be accurate if any panes were nil,
---        so this is more like "validation" than validation
+-- The count the caller passed in is the size of the manifest, not the number of panes that
+-- actually loaded -- several return nil depending on game mode, modifiers, preferences and
+-- whether GrooveStats is reachable. That mismatch is what the old FIXME here was about, and
+-- it is why panes are now addressed by id: Panes/default.lua names actors by their compacted
+-- position and publishes the surviving order, so this count and those names always agree.
+num_panes = EvalPaneCount(ToEnumShortString(mpn))
 
-local primary_i   = clamp(SL[ToEnumShortString(mpn)].EvalPanePrimary,   1, num_panes)
-local secondary_i = clamp(SL[ToEnumShortString(mpn)].EvalPaneSecondary, 1, num_panes)
+-- EvalPanePrimary/Secondary hold pane ids. A stored id can be absent from this run -- the
+-- EX pane does not exist in Casual -- so fall back to the first pane rather than to a
+-- position that would mean something different every time.
+local primary_i   = EvalPaneIndex(ToEnumShortString(mpn), SL[ToEnumShortString(mpn)].EvalPanePrimary)   or 1
+local secondary_i = EvalPaneIndex(ToEnumShortString(mpn), SL[ToEnumShortString(mpn)].EvalPaneSecondary) or 1
 
 -- -----------------------------------------------------------------------
 -- initialize local tables (panes, active_pane) for the the input handling function to use
@@ -58,7 +62,7 @@ for controller=1,2 do
 			else
 				-- initialize this player's active_pane to their profile's EvalPanePrimary
 				-- will be 1 if no profile/"Guest" profile
-				local p = clamp(SL["P"..controller].EvalPanePrimary, 1, num_panes)
+				local p = EvalPaneIndex("P"..controller, SL["P"..controller].EvalPanePrimary) or 1
 				pane:visible(i == p)
 				active_pane[controller] = p
 			end
@@ -106,6 +110,88 @@ if style == "OnePlayerTwoSides" then
 		end
 	end
 end
+
+-- -----------------------------------------------------------------------
+-- Pane numbering for the header.
+--
+-- The loaded pane count is NOT the number of pages you can reach. The navigation below
+-- refuses to stop on a pane for three separate reasons, so the header is numbered against
+-- the panes the cursor will actually land on, applying those same rules:
+--
+--   * the QR pane once there is nothing left to upload;
+--   * a leaderboard that came back empty -- the GrooveStats panes load whenever the service
+--     is switched on in the theme options, which says nothing about whether the machine is
+--     actually online, so with no network they are present but empty;
+--   * with one player joined, the pane the OTHER side is already showing. Both columns are
+--     on screen at once and the duplicate check below steps past it, so it is visible
+--     without being a page of this side's series.
+--
+-- The first two alone gave "1/5, 2/5, 3/5, 5/5" for what were really four pages.
+
+local function PaneIsSkippable(pane)
+	local root = pane:GetChild("")
+	if root == nil then return false end
+
+	-- the QR pane, once there is nothing left to upload
+	local help = root:GetChild("HelpText")
+	if help ~= nil and help:GetText() == "Score has already been submitted :)" then
+		return true
+	end
+
+	-- a leaderboard whose first row is still the placeholder, i.e. one that came back
+	-- empty -- or has not come back at all yet
+	local list = root:GetChild("HighScoreList")
+	if list ~= nil then
+		local entry = list:GetChild("HighScoreEntry1")
+		local name  = entry and entry:GetChild("Name")
+		if name ~= nil and name:GetText() == "----" then return true end
+	end
+
+	return false
+end
+
+-- Position of `index` among the reachable panes, and how many there are.
+--
+-- Recomputed on every announcement rather than cached, because a leaderboard that was
+-- empty at load stops being skippable the moment its response lands: the total is allowed
+-- to grow during the screen's life.
+local function PaneNumbering(cn, index)
+	local ocn = (cn % 2) + 1
+
+	-- The pane the other side is holding, which this side cannot land on. Never applied to
+	-- `index` itself: whatever is being announced has to come out with a number, even if a
+	-- profile somehow starts both sides on the same pane.
+	local held = nil
+	if #players == 1 and active_pane[ocn] ~= index then
+		held = active_pane[ocn]
+	end
+
+	local shown, total = 1, 0
+
+	for i=1, #panes[cn] do
+		if i ~= held and not PaneIsSkippable(panes[cn][i]) then
+			total = total + 1
+			if i == index then shown = total end
+		end
+	end
+
+	return shown, math.max(total, 1)
+end
+
+local function AnnouncePane(cn)
+	local shown, total = PaneNumbering(cn, active_pane[cn])
+
+	MESSAGEMAN:Broadcast("EvalPaneChanged", {
+		Controller = cn,
+		Index      = active_pane[cn],
+		Display    = shown,
+		Total      = total,
+	})
+end
+
+-- The opening state. Done here rather than from the header actor itself, which has no way
+-- to see the panes and so could not tell a reachable one from a skipped one.
+AnnouncePane(PlayerNumber:Reverse()[mpn] + 1)
 
 -- -----------------------------------------------------------------------
 -- input handling function
@@ -355,6 +441,14 @@ return function(event)
 			end
 
 			af:queuecommand("PaneSwitch")
+
+			-- PaneSwitch says only "something moved"; the title needs to know WHERE. Sent
+			-- for both sides because a double-mode switch can move the other side too --
+			-- but the ACTING side goes last, because the title can only name one and the
+			-- last announcement wins. Announcing the other side last would have made the
+			-- header describe the pane the player did not just move.
+			AnnouncePane(ocn)
+			AnnouncePane(cn)
 		end
 	end
 

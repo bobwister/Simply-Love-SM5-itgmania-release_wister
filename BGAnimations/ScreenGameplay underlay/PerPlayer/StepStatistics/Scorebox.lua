@@ -10,33 +10,59 @@ end
 local n = player==PLAYER_1 and "1" or "2"
 local IsUltraWide = (GetScreenAspectRatio() > 21/9)
 local NoteFieldIsCentered = (GetNotefieldX(player) == _screen.cx)
--- Eight dense rows, matched to the song wheel's own scorebox
--- (BGAnimations/ScreenSelectMusic overlay/PerPlayer/Scorebox.lua) and to LocalLeaderboard,
--- so one leaderboard reads the same on both screens instead of being five large rows here
--- and eight small ones there. Both cards are 80px tall, so the metrics port straight over.
-local NumEntries = 8
+-- This card is the same component as the song wheel's scorebox
+-- (BGAnimations/ScreenSelectMusic overlay/PerPlayer/Scorebox.lua) and LocalLeaderboard, but
+-- it is NOT the same size any more. On the wheel the card competes with a banner, a
+-- description and a difficulty grid for a 300px column; during gameplay the side pane below
+-- it is largely empty, so here the rows are half again as tall and there are more of them.
+-- Everything below derives from ROW_SCALE and NumEntries, so the two screens can diverge
+-- without the layout maths being duplicated.
+-- TWEAK: ROW_SCALE sizes the text and the row pitch together, NumEntries how many rows.
+-- The card's height follows from the two, and the frame below shifts by half the growth so
+-- the card's TOP edge stays put and it grows downward into the empty space rather than up
+-- into the judgment counts.
+local ROW_H_BASE = 10
+local ROW_SCALE = 1.5
+local NumEntries = 10
 
 -- A hairline, not the old 5px slab: the HUD idiom carries a panel edge as a thin rule and
 -- lets the fill do the work. It still takes the per-style colour, which is load-bearing --
 -- that colour is what says whether you are looking at GrooveStats, SRPG or ITL.
 local border = 2
-local width = 162
-local height = 80
 
--- A Miso line's visible band at 0.55 is 8.25px, leaving ~1.8px of leading in a 10px row.
-local row_zoom = 0.55
-local ROW_H    = height / NumEntries
+-- Matched to the banner drawn directly above it: Banner.lua puts a 418x164 sprite at
+-- zoom 0.4 on this same x, so 167.2px wide. These two are the widest things in the column
+-- and a shared right edge is what makes it read as a column at all. The card is CENTRED on
+-- x=70 rather than anchored, so any width beyond the banner's overhangs on BOTH sides --
+-- which is what a wider card here did, most visibly on the right.
+local width = 167
+local height = ROW_H_BASE * ROW_SCALE * NumEntries
+
+-- A Miso line's visible band at 0.55 is 8.25px, leaving ~1.8px of leading in a 10px row;
+-- both scale together so that leading is preserved at any ROW_SCALE.
+local row_zoom = 0.55 * ROW_SCALE
+local ROW_H    = ROW_H_BASE * ROW_SCALE
 
 -- Column anchors from the card's centre, replacing the raw "-width/2 + 27" literals that
 -- used to sit inline in every row actor.
-local RANK_X  = -width/2 + 18   -- right-aligned
-local NAME_X  = -width/2 + 21   -- left-aligned
-local SCORE_X =  width/2 - 3    -- right-aligned
-local CROWN_X = -width/2 + 10
+--
+-- PAD and the inter-column gap are in SCREEN pixels and deliberately NOT multiplied by
+-- ROW_SCALE. They are margins, and a margin does not need to grow because the text did --
+-- scaling them spent about 7px of the name column on white space that was never read.
+local PAD    = 4
+local RANK_W = 20 * row_zoom                    -- budget for "10.", enforced by maxwidth below
+
+local CROWN_X = -width/2 + PAD + (ROW_H-2)/2    -- the crown is square, ROW_H-2 on a side
+local RANK_X  = -width/2 + PAD + RANK_W         -- right-aligned
+local NAME_X  = RANK_X + 5                      -- left-aligned
+local SCORE_X =  width/2 - 3                    -- right-aligned
 
 -- maxwidth is in UNZOOMED font units, so the screen budget is divided by the zoom.
--- SCORE_PX is the room kept clear for the widest score string at row_zoom.
-local SCORE_PX = 34
+-- SCORE_PX is the room kept clear for the widest score string at row_zoom. Deliberately
+-- generous: it is only the starting value, replaced by a measurement once the actors
+-- exist (see ScoreProbe below), and erring wide costs name room while erring narrow puts
+-- names underneath scores.
+local SCORE_PX = 34 * ROW_SCALE
 local NAME_MAXWIDTH = ((SCORE_X - SCORE_PX) - NAME_X) / row_zoom
 
 local cur_style = 0
@@ -332,7 +358,8 @@ end
 local af = Def.ActorFrame{
 	Name="ScoreBox"..pn,
 	InitCommand=function(self)
-		self:xy(70 * (player==PLAYER_1 and 1 or -1), -115)
+		-- The -115 anchored an 80px card; keep its TOP edge there as the card grows.
+		self:xy(70 * (player==PLAYER_1 and 1 or -1), -115 + (height - 80)/2)
 		-- offset a bit more when NoteFieldIsCentered
 		if NoteFieldIsCentered and IsUsingWideScreen() then
 			self:addx( 2 * (player==PLAYER_1 and 1 or -1) )
@@ -522,6 +549,34 @@ local af = Def.ActorFrame{
 	},
 }
 
+-- The name column ends where the score column begins, and the score column is as wide as
+-- the widest score can be rendered -- which depends on the font, and ThemeFont is a user
+-- preference. Hardcoding one font's metrics here would put names underneath scores on any
+-- other one, so measure it rather than predict it.
+--
+-- Scores are string.format("%.2f", score/100) on a score out of 10000, so "100.00" is the
+-- widest string that can occur. Applied from OnCommand, which runs after every child's
+-- InitCommand, so it does not depend on the order actors are built in.
+af[#af+1] = Def.BitmapText{
+	Name="ScoreProbe",
+	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
+	Text="100.00",
+	InitCommand=function(self)
+		self:zoom(row_zoom):visible(false)
+	end,
+	OnCommand=function(self)
+		-- TWEAK: NAME_GAP is the clear space kept between the longest name and the longest
+		-- score, in screen pixels.
+		local NAME_GAP = 6
+		local name_right = SCORE_X - self:GetZoomedWidth() - NAME_GAP
+
+		for i=1,NumEntries do
+			local name = self:GetParent():GetChild("Name"..i)
+			if name then name:maxwidth( (name_right - NAME_X) / row_zoom ) end
+		end
+	end,
+}
+
 for i=1,NumEntries do
 	local y = -height/2 + ROW_H*i - ROW_H/2
 	local zoom = row_zoom
@@ -569,7 +624,7 @@ for i=1,NumEntries do
 			Name="Rank"..i,
 			Text="",
 			InitCommand=function(self)
-				self:diffuse(HUD_LABEL):xy(RANK_X, y):maxwidth(30):horizalign(right):zoom(zoom)
+				self:diffuse(HUD_LABEL):xy(RANK_X, y):maxwidth(RANK_W / row_zoom):horizalign(right):zoom(zoom)
 			end,
 			LoopScoreboxCommand=function(self)
 				self:linear(transition_seconds/2):diffusealpha(0):queuecommand("SetScorebox")

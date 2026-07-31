@@ -126,8 +126,9 @@ local PlayerDefaults = {
 			-- default panes to intialize ScreenEvaluation to
 			-- when only a single player is joined (single, double)
 			-- in versus (2 players joined) only EvalPanePrimary will be used
-			self.EvalPanePrimary   = 1 -- large score and judgment counts
-			self.EvalPaneSecondary = 5 -- offset histogram
+			-- These are pane IDS, not positions: see Scripts/SL-Helpers-EvalPanes.lua.
+			self.EvalPanePrimary   = "ScoreITG" -- large score and judgment counts
+			self.EvalPaneSecondary = "Timing"   -- offset histogram
 
 			-- The Groovestats API key loaded for this player
 			self.ApiKey = ""

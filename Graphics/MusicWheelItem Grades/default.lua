@@ -179,6 +179,13 @@ return Def.ActorFrame{
 			self.song = params.Song
 			Decide(self)
 		end,
+
+		-- A score just arrived from GrooveStats for this row. Stars are a function of the
+		-- ITG percentage, so an import can change this grade -- and without this the new
+		-- star only appeared once the selection moved off the song and back.
+		OnlineScoresUpdatedMessageCommand=function(self, params)
+			if params and params.Song == self.song then Decide(self) end
+		end,
 	},
 	
 	Def.Sprite{

@@ -71,6 +71,23 @@ local value_baseline_fix = -5 * value_zoom
 -- vertical center of the 32px footer band
 local footer_cy = _screen.h - 16
 
+-- The two clocks sit either side of centre, each as a right-aligned label followed by a
+-- left-aligned value that grows toward the next group.
+--
+-- That growth is the whole problem: FormatDuration switches from MM:SS to H:MM:SS once a
+-- session passes an hour, and the session value gained two characters with nowhere to put
+-- them -- it ran straight into the "IN-SONG" label. The groups are pushed further apart
+-- here, and the session value is additionally capped so a long session squeezes rather
+-- than collides. A cap alone would have been enough to stop the overlap, but it would
+-- have squeezed the number on every session over an hour, which is most of them.
+--
+-- TWEAK: LABEL_X is the |x| of each label's right edge, VALUE_X where its value starts.
+-- Raising LABEL_X spreads the pair outward; SESSION_MAXWIDTH must stay under
+-- (LABEL_X - width of "IN-SONG" - VALUE_X) or the cap does nothing.
+local LABEL_X = 68
+local VALUE_X = 62
+local SESSION_MAXWIDTH = 80
+
 local af = Def.ActorFrame{
 	InitCommand=function(self)
 		-- TimeAtSessionStart is reset to nil between game sessions, so a nil value
@@ -119,28 +136,29 @@ af[#af+1] = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text="SESSION",
 		InitCommand=function(self)
-			self:horizalign(right):zoom(label_zoom):x(-58):diffuse(label_color)
+			self:horizalign(right):zoom(label_zoom):x(-LABEL_X):diffuse(label_color)
 		end
 	},
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " numbers")..{
 		Name="SessionTimer",
 		InitCommand=function(self)
 			session_bmt = self
-			self:horizalign(left):zoom(value_zoom):xy(-52, value_baseline_fix):diffuse(Color.White)
+			self:horizalign(left):zoom(value_zoom):xy(-VALUE_X, value_baseline_fix):diffuse(Color.White)
+			self:maxwidth(SESSION_MAXWIDTH / value_zoom)
 		end
 	},
 
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Text="IN-SONG",
 		InitCommand=function(self)
-			self:horizalign(right):zoom(label_zoom):x(58):diffuse(label_color)
+			self:horizalign(right):zoom(label_zoom):x(LABEL_X):diffuse(label_color)
 		end
 	},
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " numbers")..{
 		Name="PlayTimer",
 		InitCommand=function(self)
 			play_bmt = self
-			self:horizalign(left):zoom(value_zoom):xy(64, value_baseline_fix):diffuse(Accent())
+			self:horizalign(left):zoom(value_zoom):xy(VALUE_X + 6, value_baseline_fix):diffuse(Accent())
 		end,
 		ColorSelectedMessageCommand=function(self) self:diffuse(Accent()) end
 	},

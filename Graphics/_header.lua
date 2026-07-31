@@ -64,5 +64,29 @@ return Def.ActorFrame{
 		ResetHeaderTextMessageCommand=function(self)
 			self:settext(THEME:GetString(SCREENMAN:GetTopScreen():GetName(), "HeaderText"))
 		end
+	},
+
+	-- A quieter tail after the header, for a counter or a position that belongs with the
+	-- title but must not compete with it. ScreenEvaluation uses it for "(5 / 6)" beside the
+	-- pane name; every other screen simply never broadcasts to it and it stays empty.
+	--
+	-- It measures the header rather than sitting at a fixed x, because the header's width
+	-- changes with the screen, the language and -- on evaluation -- the pane. HeaderText
+	-- carries no maxwidth, so GetZoomedWidth is its true drawn width.
+	LoadFont(ThemePrefs.Get("ThemeFont") .. " Header")..{
+		Name="HeaderSuffix",
+		Text="",
+		InitCommand=function(self)
+			self:diffusealpha(0):horizalign(left):xy(20, 15)
+			self:zoom( SL_WideScale(0.7,0.7) * 0.62 ):diffuse(HUD_LABEL)
+		end,
+		OnCommand=function(self) self:sleep(0.1):decelerate(0.33):diffusealpha(1) end,
+		OffCommand=function(self) self:accelerate(0.33):diffusealpha(0) end,
+		SetHeaderSuffixMessageCommand=function(self, params)
+			self:settext(params.Text or "")
+
+			local main = self:GetParent() and self:GetParent():GetChild("HeaderText")
+			self:x( 20 + (main and main:GetZoomedWidth() or 0) + 8 )
+		end,
 	}
 }

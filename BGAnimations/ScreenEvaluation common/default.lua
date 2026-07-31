@@ -111,6 +111,11 @@ end
 
 t[#t+1] = LoadActor("./Panes/default.lua", NumPanes)
 
+-- Names the pane each column is showing, and its position in the series. Must come AFTER
+-- the panes: it reads the surviving pane order that Panes/default.lua publishes as it
+-- loads them.
+t[#t+1] = LoadActor("./Shared/PaneHeading.lua")
+
 -- -----------------------------------------------------------------------
 
 -- The actor that will automatically upload scores to GrooveStats.

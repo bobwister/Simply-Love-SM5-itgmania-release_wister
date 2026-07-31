@@ -479,7 +479,7 @@ local Overrides = {
 				mods.ShowFaPlusPane = true
 				mods.SmallerWhite = false
 				-- Default to FA+ pane in Tournament Mode
-				sl_pn.EvalPanePrimary = 2
+				sl_pn.EvalPanePrimary = "ScoreEX"
 				return
 			end
 
@@ -496,7 +496,7 @@ local Overrides = {
 			-- Default eval pane to FA+ pane when the FA+ window or EX score is shown and the pane is on.
 			-- ShowEXScore is derived by the Primary/Secondary Score Display rows; recompute here too so
 			-- this stays correct regardless of the order SaveSelections runs across rows.
-			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and "ScoreEX" or "ScoreITG"
 		end
 	},
 	-------------------------------------------------------------------------
@@ -518,7 +518,7 @@ local Overrides = {
 			-- ShowEXScore drives all downstream EX behavior (evaluation, target, submission).
 			-- True only when the actual EX score (not Super EX) is shown in either slot.
 			mods.ShowEXScore = (mods.PrimaryScore == "EXScore") or (mods.SecondaryScore == "EXScore")
-			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and "ScoreEX" or "ScoreITG"
 		end,
 	},
 	-------------------------------------------------------------------------
@@ -538,7 +538,7 @@ local Overrides = {
 				if list[i] then mods.SecondaryScore = val; break end
 			end
 			mods.ShowEXScore = (mods.PrimaryScore == "EXScore") or (mods.SecondaryScore == "EXScore")
-			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and 2 or 1
+			sl_pn.EvalPanePrimary = ((mods.ShowFaPlusWindow or mods.ShowEXScore) and mods.ShowFaPlusPane) and "ScoreEX" or "ScoreITG"
 		end,
 	},
 	-------------------------------------------------------------------------

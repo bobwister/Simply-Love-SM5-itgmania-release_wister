@@ -1,7 +1,7 @@
 -- Ctrl+Shift+R on ScreenEvaluation: resync the just-played song's #OFFSET to
 -- cancel the (solo) player's systematic timing bias — their signed mean offset.
 -- The math + file IO live in ResyncSongOffsetFromMean() (Scripts/SL-Helpers.lua);
--- this actor wires up the hotkey (solo only, KeyboardFeatures, not course mode)
+-- this actor wires up the hotkey (solo only, not course mode)
 -- and renders a brief confirmation of the old/new sync and the applied shift.
 
 local Players = GAMESTATE:GetHumanPlayers()
@@ -50,8 +50,11 @@ local LATER_COLOR = color("#89ffa2")
 local t = Def.ActorFrame{
 	Name="ResyncHandler",
 	OnCommand=function(self)
+		-- Deliberately NOT gated on the KeyboardFeatures theme option. That option defaults
+		-- to false, which made this hotkey invisible and inert on a fresh install with no
+		-- hint that an option governed it. It costs nothing to leave registered: the
+		-- callback only ever reacts to Ctrl+Shift held together with R.
 		if player
-		and ThemePrefs.Get("KeyboardFeatures")
 		and not GAMESTATE:IsCourseMode() then
 			SCREENMAN:GetTopScreen():AddInputCallback(ResyncInputHandler)
 		end

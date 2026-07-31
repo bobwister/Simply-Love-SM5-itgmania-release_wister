@@ -155,6 +155,14 @@ return Def.ActorFrame{
 			if player ~= PLAYER_2 then return end
 			MaybeSetLampForUnmarkedItlSong(self, player)
 		end,
+		-- A score just arrived from GrooveStats for this row. An import earns the plain
+		-- blue clear lamp, so the lamp has to be recomputed -- otherwise it stayed dark
+		-- until the selection moved off the song and back.
+		OnlineScoresUpdatedMessageCommand=function(self, params)
+			if params and params.Song == self.song then
+				self:playcommand("Set", { Song=self.song })
+			end
+		end,
 		PlayerJoinedMessageCommand=function(self)
 			self:visible(GAMESTATE:IsPlayerEnabled(player))
 		end,
@@ -162,6 +170,10 @@ return Def.ActorFrame{
 			self:visible(GAMESTATE:IsPlayerEnabled(player))
 		end,
 		SetCommand=function(self, param)
+			-- Remembered so an online score arriving later can replay this command for
+			-- the right row -- see OnlineScoresUpdated above.
+			self.song = param.Song
+
 			-- Only use lamps if a profile is found for an enabled player.
 			if not GAMESTATE:IsPlayerEnabled(player) or not PROFILEMAN:IsPersistentProfile(player) then
 				self:visible(false)

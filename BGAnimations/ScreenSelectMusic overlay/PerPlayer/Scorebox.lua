@@ -285,6 +285,19 @@ local LeaderboardRequestProcessor = function(res, master)
 				-- The API sends hundredths (9823), the store keeps percent (98.23).
 				if OnlineScoreRecord(player, capture_song, capture_steps, field, raw/100, capture_hash) then
 					OnlineScoresWrite(player)
+
+					-- Tell the wheel. The row that was already drawn read the store before
+					-- this response existed, and rows only redraw on "Set" -- which the
+					-- engine sends when the SELECTION moves. Without this the score you
+					-- just downloaded stayed invisible until you scrolled off the song and
+					-- back, which is precisely when it looked like it had not worked.
+					--
+					-- Carries the song, so a row can ignore an update that is not about it
+					-- rather than every visible row re-reading the store.
+					MESSAGEMAN:Broadcast("OnlineScoresUpdated", {
+						Player = player,
+						Song   = capture_song,
+					})
 				end
 			end
 		end

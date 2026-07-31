@@ -106,17 +106,140 @@ local pane = Def.ActorFrame{
 	end
 }
 
--- the line in the middle indicating where truly flawless timing (0ms offset) is
-pane[#pane+1] = Def.Quad{
-	InitCommand=function(self)
-		local x = pane_width/2
+-- ---------------------------------------------
+-- Axis furniture.
+--
+-- The histogram had no scale at all: a bar's horizontal position was readable only against
+-- the judgment abbreviations along the bottom, which tell you WHICH window you landed in
+-- but never by how much. These add the millisecond ruler that was missing.
+--
+-- The window boundaries are drawn BEFORE the histogram is added below, so the bars sit on
+-- top of them rather than being cut by them: they are backdrop, and a bar's height is the
+-- thing being read. The two lines that describe the RUN -- dead centre and the bias -- are
+-- the opposite case and are added last, at the bottom of this file.
 
-		self:vertalign(top)
-			:zoomto(1, pane_height - (topbar_height+bottombar_height) )
-			:vertalign(bottom):xy(x, 0)
-			:diffuse(1,1,1,0.666)
-	end,
-}
+-- Height of the histogram body: bars are scaled to pane_height*0.75 in Calculations.lua.
+local body_height = pane_height * 0.75
+
+-- x of the mean-offset line, in pane coordinates. Computed with the rest of the summary
+-- below, but drawn at the very end of the file, so it has to outlive that block.
+local mean_x = nil
+
+-- TWEAK: RULER_Y is where the millisecond numbers sit. It lines up with the existing
+-- "Early"/"Late" texts so the top of the body reads as one ruler line rather than two
+-- rows of stray text. Bars are shortest out at the window boundaries, which is exactly
+-- where these numbers go, so collisions are rare.
+local RULER_Y    = -125
+local RULER_ZOOM = 0.4
+
+-- TWEAK: the mean marker's colour. Deliberately outside the judgment palette -- it is not
+-- a timing window, it is a property of the run -- and shared by the line and the hotkey
+-- hint so the two read as one statement.
+local MEAN_COLOR = color("#FFB000")
+
+-- Maps a timing offset in SECONDS onto the pane's x axis. GetTimingWindow returns
+-- seconds, and this is the same mapping the judgment labels along the bottom already use.
+local function XForOffset(seconds)
+	return scale(seconds, -worst_window, worst_window, 0, pane_width)
+end
+
+-- A guide line at each timing-window boundary, plus the boundary's value in ms. Drawn for
+-- both the early and the late side of each window.
+for i=1, num_judgments_available do
+	local window = GetTimingWindow(i)
+
+	-- The outermost boundary IS the edge of the pane, where a line would just thicken the
+	-- border and the number would be clipped.
+	if window < worst_window then
+		for _, sign in ipairs({-1, 1}) do
+			local x = XForOffset(sign * window)
+
+			pane[#pane+1] = Def.Quad{
+				InitCommand=function(self)
+					self:vertalign(bottom):xy(x, 0)
+						:zoomto(1, body_height)
+						:diffuse( DimColor(colors[i], 1.0, 0.22) )
+				end,
+			}
+
+			pane[#pane+1] = Def.BitmapText{
+				Font=ThemePrefs.Get("ThemeFont") .. " Normal",
+				Text=("%+d"):format(sign * window * 1000),
+				InitCommand=function(self)
+					self:xy(x, RULER_Y):zoom(RULER_ZOOM)
+						:diffuse( DimColor(colors[i], 1.0, 0.75) )
+				end,
+			}
+		end
+	end
+end
+
+-- ---------------------------------------------
+-- The three summary numbers along the top bar describe the SHAPE of this histogram, but
+-- nothing tied them to it -- you had to picture what "mean -4.20ms" or "std dev * 3"
+-- looked like against the bars. These draw them.
+--
+-- Only worth doing when there were offsets to summarise; with no hits, avg_offset and
+-- std_dev are both still 0 and a line at dead centre would be a lie.
+if count > 0 then
+	-- The +/- 3 sigma band, which is the "std dev * 3" readout made visible: on a normal
+	-- distribution it is where about 99.7% of the hits fall, so its width is a direct
+	-- picture of consistency. Drawn first, so the mean line lands on top of it.
+	if std_dev > 0 then
+		local lo = XForOffset( (avg_offset - std_dev*3) / 1000 )
+		local hi = XForOffset( (avg_offset + std_dev*3) / 1000 )
+
+		-- Clamped: three sigma on a scattered run runs off both ends of the pane, and an
+		-- unclamped quad would spill over the border and the neighbouring pane.
+		lo = clamp(lo, 0, pane_width)
+		hi = clamp(hi, 0, pane_width)
+
+		if hi > lo then
+			pane[#pane+1] = Def.Quad{
+				InitCommand=function(self)
+					self:vertalign(bottom):horizalign(left):xy(lo, 0)
+						:zoomto(hi - lo, body_height)
+						:diffuse(1, 1, 1, 0.07)
+				end,
+			}
+		end
+	end
+
+	-- The mean offset itself. Only the position is settled here; the line is drawn at the
+	-- end of the file so it lands on top of the bars.
+	local x = XForOffset(avg_offset / 1000)
+	if x >= 0 and x <= pane_width then mean_x = x end
+
+	-- Ctrl+Shift+R resyncs the song's #OFFSET to cancel this very mean, and nothing on the
+	-- screen said so -- the feature was discoverable only by reading ResyncHandler.lua.
+	--
+	-- Shown only when it would actually do something, and only when it would actually
+	-- work. The conditions mirror ResyncHandler.lua exactly (solo, not course mode);
+	-- advertising a hotkey that is wired to nothing would be worse than saying nothing.
+	-- TWEAK: RESYNC_HINT_MS is how far off centre the mean has to be before this is worth
+	-- suggesting. Below a few ms the resync is noise, not a correction.
+	local RESYNC_HINT_MS = 3
+
+	if math.abs(avg_offset) >= RESYNC_HINT_MS
+		and #GAMESTATE:GetHumanPlayers() == 1
+		and not GAMESTATE:IsCourseMode()
+	then
+		-- Anchored to the far LEFT edge of the body, not the centre. Two reasons: the
+		-- centre is where the tallest bars are, and everything above y=-body_height is
+		-- covered by the top bar's background quad, which is added further down this file
+		-- and therefore draws on top. The left edge is the worst-judgment end of the
+		-- scale, where there is essentially never a bar to collide with.
+		pane[#pane+1] = Def.BitmapText{
+			Font=ThemePrefs.Get("ThemeFont") .. " Normal",
+			Text=ScreenString("ResyncHint"),
+			InitCommand=function(self)
+				self:horizalign(left):xy(4, -body_height + 8):zoom(0.38)
+					:diffuse(MEAN_COLOR):diffusealpha(0.9)
+					:maxwidth((pane_width - 8) / 0.38)
+			end,
+		}
+	end
+end
 
 -- "Early" text
 pane[#pane+1] = Def.BitmapText{
@@ -267,6 +390,57 @@ if next(offsets) ~= nil then
 	end
 
 	pane[#pane+1] = histogram
+end
+
+-- --------------------------------------------------------
+-- Reference lines: dead centre, and the bias.
+--
+-- Added after the histogram, and therefore drawn over it. These two are not backdrop like
+-- the window boundaries above: the whole point of the bias line is to be read AGAINST the
+-- bars -- how far the mass of them sits from zero -- and a line hidden behind the tallest
+-- bars is hidden exactly where the mass is.
+
+-- the line in the middle indicating where truly flawless timing (0ms offset) is
+pane[#pane+1] = Def.Quad{
+	InitCommand=function(self)
+		self:vertalign(bottom):xy(pane_width/2, 0)
+			:zoomto(1, pane_height - (topbar_height+bottombar_height) )
+			:diffuse(1,1,1,0.666)
+	end,
+}
+
+if mean_x ~= nil then
+	-- Dashed, so that it reads as an annotation rather than as part of the histogram: it
+	-- now sits over the bars, and a second solid vertical line among them would be one
+	-- more thing to tell apart from the boundaries at a glance.
+	--
+	-- Drawn as a column of short quads, because there is no dash style to ask for -- the
+	-- engine only draws solid rectangles, so the dashes have to BE the rectangles.
+	-- TWEAK: dash and gap length in pixels. Roughly 15 dashes over the body at 5/4.
+	local DASH_LEN, DASH_GAP = 5, 4
+
+	local dashes = Def.ActorFrame{
+		InitCommand=function(self) self:xy(mean_x, 0) end,
+	}
+
+	local y = 0
+	while y < body_height do
+		local top = y
+		local len = math.min(DASH_LEN, body_height - y)
+
+		dashes[#dashes+1] = Def.Quad{
+			InitCommand=function(self)
+				self:vertalign(bottom):xy(0, -top)
+					:zoomto(1, len)
+					:diffuse(MEAN_COLOR)
+					:diffusealpha(0.9)
+			end,
+		}
+
+		y = y + DASH_LEN + DASH_GAP
+	end
+
+	pane[#pane+1] = dashes
 end
 
 local label = {}

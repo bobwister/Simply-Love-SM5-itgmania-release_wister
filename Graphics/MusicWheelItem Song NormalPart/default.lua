@@ -23,16 +23,25 @@ local IsNotWide = (GetScreenAspectRatio() < 16/9)
 -- item_width puts the group hard against the row's right edge instead of
 -- leaving the ~36px of dead margin the old _screen.w/2.14 anchor did.
 --
--- TWEAK: ITL_ZOOM is the size of these numbers. Enlarging them eats into the
--- song title, whose maxwidth is set in metrics.ini under [TextBanner] and has
--- to stay clear of ITL_BLOCK_LEFT below -- the two are a trade-off.
-local ITL_ZOOM = 0.40
+-- TWEAK: ITL_SCALE sizes the whole right-hand group -- the text AND the column
+-- offsets together, which is the only way to resize it safely. The offsets below
+-- were measured to fit these numbers at the base size, so scaling the text alone
+-- makes the columns run into each other, and scaling the offsets alone leaves
+-- gaps. Both derive from this one number.
+--
+-- The columns grow leftward from a fixed right margin, so raising this pushes
+-- ITL_BLOCK_LEFT further left and the song title must give up exactly that many
+-- pixels: TextBanner's maxwidth in metrics.ini carries the matching subtraction,
+-- and the comment there shows the arithmetic. At 1.4 the group widened by 44px.
+local ITL_SCALE = 1.4
+
+local ITL_ZOOM = 0.40 * ITL_SCALE
 local ITL_ANCHOR   = item_width - 14
-local ITL_COL_EX   = ITL_ANCHOR - 24
-local ITL_COL_RANK = ITL_ANCHOR - 38
-local ITL_COL_PTS  = ITL_ANCHOR - 70
+local ITL_COL_EX   = ITL_ANCHOR - 24 * ITL_SCALE
+local ITL_COL_RANK = ITL_ANCHOR - 38 * ITL_SCALE
+local ITL_COL_PTS  = ITL_ANCHOR - 70 * ITL_SCALE
 -- Left edge of the whole group, i.e. where the title has to stop.
-local ITL_BLOCK_LEFT = ITL_COL_PTS - 40
+local ITL_BLOCK_LEFT = ITL_COL_PTS - 40 * ITL_SCALE
 -- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
 -- treatment already used on the evaluation screen.
 local ITL_LABEL_COLOR = color("#5A6166")
@@ -287,6 +296,14 @@ for player in ivalues(PlayerNumber) do
 		CurrentStepsP2ChangedMessageCommand=function(self)
 			self:playcommand("Set", { Song=self.song })
 		end,
+		-- A score just arrived from GrooveStats for this row's song. Same shape as the
+		-- ITLRankResolved handler further down: an async fetch lands after the row was
+		-- drawn, so the row redraws itself rather than waiting for the next selection.
+		OnlineScoresUpdatedMessageCommand=function(self, params)
+			if params and params.Song == self.song then
+				self:playcommand("Set", { Song=self.song })
+			end
+		end,
 	}
 	--[[ Song Rank (local top-N rank among this profile's ITL songs).
 	-- Superseded by the global ITL rank + points display below; kept here
@@ -493,6 +510,13 @@ af[#af+1] = Def.BitmapText{
 	end,
 	CurrentStepsP2ChangedMessageCommand=function(self)
 		self:playcommand("Set", { Song=self.song })
+	end,
+	-- See the EX column above: an imported score lands after the row was drawn, so the
+	-- row redraws instead of waiting for the selection to move.
+	OnlineScoresUpdatedMessageCommand=function(self, params)
+		if params and params.Song == self.song then
+			self:playcommand("Set", { Song=self.song })
+		end
 	end,
 }
 
