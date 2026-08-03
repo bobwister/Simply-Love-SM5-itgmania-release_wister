@@ -25,8 +25,10 @@ local PAD = 4
 
 local ITL_LABEL_X = -W/2 + PAD
 local ITL_VALUE_X =  W/2 - PAD
-local ITL_LABEL_ZOOM = 0.34
-local ITL_VALUE_ZOOM = 0.46
+-- 0.34 is ~9 real pixels at 480p. maxwidth below divides by the zoom, so raising
+-- it buys height without growing into the figure's column.
+local ITL_LABEL_ZOOM = SL_LowRes(0.34, 0.44)
+local ITL_VALUE_ZOOM = SL_LowRes(0.46, 0.54)
 
 -- The event block holds up to MAX_EVENT_ROWS rows, and however many the active event
 -- actually has are centred in it -- ITL has three, Stamina RPG two. Positions are worked
@@ -34,7 +36,8 @@ local ITL_VALUE_ZOOM = 0.46
 -- instead of leaving a hole where the third row used to be.
 local MAX_EVENT_ROWS = 3
 local ROW_BLOCK_CY   = 21
-local ROW_SPACING    = 13
+-- Three rows at 15 span y=6..36 around ROW_BLOCK_CY, still clear of RULE_Y.
+local ROW_SPACING    = SL_LowRes(13, 15)
 
 local function RowY(i, count)
 	return ROW_BLOCK_CY + (i - (count + 1)/2) * ROW_SPACING
@@ -55,7 +58,8 @@ local CELL_W     = (W - 2*PAD) / 3
 local STAR_ROW_Y = { 54, 68 }
 local ICON_SIZE  = 14
 local ICON_X     = 2 + ICON_SIZE/2      -- from the cell's left edge
-local COUNT_ZOOM = 0.42
+-- ~23px left in the cell once the 14px icon is placed: four digits fit at 0.50.
+local COUNT_ZOOM = SL_LowRes(0.42, 0.50)
 
 local GRADE_SHEET = THEME:GetPathG("MusicWheelItem", "Grades/grades 1x18.png")
 local QUINT_ICON  = THEME:GetPathG("MusicWheelItem", "Grades/quint.png")

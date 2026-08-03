@@ -85,11 +85,26 @@ local quiet = color("#6E838D")  -- the n/total counter, the least important thin
 -- TWEAK: rail geometry. Positions are relative to the rail's own frame, which
 -- is centred in the header band.
 local RAIL_Y        = 16
-local CURRENT_ZOOM  = 0.62
 local NEIGHBOUR_X   = 104   -- where the flanking pack names sit
 local NEIGHBOUR_ZOOM= 0.45
 local CHEVRON_X     = 92
 local COUNTER_X     = 232
+
+-- What the rail can afford to show -- two separate questions.
+--
+-- ROOM: the neighbour names start at cx-254, i.e. x=173 at 16:9 but x=66 at 4:3,
+-- which runs straight through "SELECT MUSIC" (drawn at x=20, no maxwidth, in
+-- Graphics/_header.lua). Dropping them at 4:3 pulls the rail back to the current
+-- pack name and clears the title. Navigation is untouched.
+--
+-- LEGIBILITY: the Ctrl+Left/Right hints and song count share LEGEND_ZOOM 0.26 --
+-- ~7 real pixels at 480p. A cabinet has no keyboard for the hints anyway.
+local SHOW_NEIGHBOURS = IsUsingWideScreen()
+local SHOW_LEGENDS    = not SL_IsLowRes()
+
+-- The two survivors take the freed room.
+local CURRENT_ZOOM  = SL_LowRes(0.62, 0.78)
+local COUNTER_ZOOM  = SL_LowRes(0.40, 0.50)
 
 -- Shortcut legend under each chevron. It sits a row below everything else, which is
 -- what lets it be this wide without colliding with the pack names either side of it.
@@ -363,6 +378,7 @@ local af = Def.ActorFrame{
 		InitCommand=function(self)
 			self:horizalign(right):zoom(NEIGHBOUR_ZOOM):x(-NEIGHBOUR_X)
 			self:maxwidth(150/NEIGHBOUR_ZOOM):diffuse(faint)
+			self:visible(SHOW_NEIGHBOURS)
 		end,
 		SetRailCommand=function(self, params)
 			self:settext(params and params.prev or "")
@@ -382,6 +398,7 @@ local af = Def.ActorFrame{
 		Text=LEGEND_PREV,
 		InitCommand=function(self)
 			self:zoom(LEGEND_ZOOM):xy(-CHEVRON_X, LEGEND_Y):diffuse(quiet)
+			self:visible(SHOW_LEGENDS)
 		end
 	},
 
@@ -410,6 +427,7 @@ local af = Def.ActorFrame{
 		Text=LEGEND_NEXT,
 		InitCommand=function(self)
 			self:zoom(LEGEND_ZOOM):xy(CHEVRON_X, LEGEND_Y):diffuse(quiet)
+			self:visible(SHOW_LEGENDS)
 		end
 	},
 
@@ -419,6 +437,7 @@ local af = Def.ActorFrame{
 		InitCommand=function(self)
 			self:horizalign(left):zoom(NEIGHBOUR_ZOOM):x(NEIGHBOUR_X)
 			self:maxwidth(150/NEIGHBOUR_ZOOM):diffuse(faint)
+			self:visible(SHOW_NEIGHBOURS)
 		end,
 		SetRailCommand=function(self, params)
 			self:settext(params and params.next or "")
@@ -430,7 +449,7 @@ local af = Def.ActorFrame{
 	LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="Counter",
 		InitCommand=function(self)
-			self:horizalign(right):zoom(0.4):x(COUNTER_X):diffuse(quiet)
+			self:horizalign(right):zoom(COUNTER_ZOOM):x(COUNTER_X):diffuse(quiet)
 		end,
 		SetRailCommand=function(self, params)
 			self:settext(params and params.counter or "")
@@ -446,6 +465,7 @@ local af = Def.ActorFrame{
 		InitCommand=function(self)
 			self:horizalign(right):zoom(LEGEND_ZOOM):xy(COUNTER_X, LEGEND_Y)
 			self:diffuse(quiet)
+			self:visible(SHOW_LEGENDS)
 		end,
 		SetRailCommand=function(self, params)
 			local n = params and params.songs

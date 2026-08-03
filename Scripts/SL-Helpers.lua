@@ -38,6 +38,40 @@ end
 
 
 -- -----------------------------------------------------------------------
+-- SL_IsLowRes() -- are we drawing to a physically small panel (a 480p cabinet)?
+--
+-- Not derived from SCREEN_*/_screen.*: those describe the virtual canvas, which
+-- follows aspect ratio alone, so the layout is identical at 480p and 1080p. Only
+-- the pixels per virtual unit differ (1.0 vs 2.25), which is why a zoom-0.26
+-- caption is readable on a desktop and ~7px of mush on a cabinet.
+--
+--   SL_WideScale(a, b) -- horizontal ROOM   (aspect ratio)
+--   SL_IsLowRes()      -- real PIXELS       (legibility)
+--
+-- Automatic by design: the operator already picked a resolution in the graphics
+-- options, so no theme preference sits in front of it.
+
+-- Cached: read from per-row wheel commands, and the display mode can't change
+-- without a restart.
+local is_low_res = nil
+
+SL_IsLowRes = function()
+	if is_low_res == nil then
+		local height = PREFSMAN:GetPreference("DisplayHeight")
+		is_low_res = (type(height) == "number" and height <= 480)
+	end
+	return is_low_res
+end
+
+-- -----------------------------------------------------------------------
+-- Pick between two values, shaped like SL_WideScale so call sites read alike.
+
+SL_LowRes = function(normal, lowres)
+	return SL_IsLowRes() and lowres or normal
+end
+
+
+-- -----------------------------------------------------------------------
 -- get timing window in milliseconds
 
 GetTimingWindow = function(n, mode, tenms)

@@ -138,7 +138,10 @@ for index, label in ipairs(RadarCategories) do
 								or ThemePrefs.Get("ThemeFont") == "Mega" and "Mega/_mega font"
 								or ThemePrefs.Get("ThemeFont") == "Unprofessional" and "Unprofessional/_unprofessional small")..{
 				Text=ScoreDisplayLabel(score_type),
-				InitCommand=function(self) self:zoom(0.5):horizalign(right) end,
+				-- Clamped like the sibling labels above (both maxwidth(76)): this sits
+				-- 95px left of a pane origin at _screen.cx-155, so the widest label
+				-- ("H. EX") has ~70px before the screen edge at 4:3 against ~177 at 16:9.
+				InitCommand=function(self) self:zoom(0.5):horizalign(right):maxwidth( SL_WideScale(120, 240) ) end,
 				BeginCommand=function(self)
 					self:x( (controller == PLAYER_1 and -145) or 95 )
 					self:y(38)
