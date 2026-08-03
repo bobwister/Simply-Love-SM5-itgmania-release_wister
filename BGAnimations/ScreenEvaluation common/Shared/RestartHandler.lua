@@ -4,13 +4,10 @@ local RestartHandler = function(event)
 	if event.type == "InputEventType_FirstPress" then
 		if event.DeviceInput.button == "DeviceButton_left ctrl" then
 			holdingCtrl = true
-		elseif event.DeviceInput.button == "DeviceButton_left shift"
-		    or event.DeviceInput.button == "DeviceButton_right shift" then
-			holdingShift = true
 		elseif event.DeviceInput.button == "DeviceButton_r" then
-			-- Ctrl+R replays. Ctrl+Shift+R is reserved for the mean-based resync
-			-- hotkey (see Shared/ResyncHandler.lua), so don't replay when Shift is held.
-			if holdingCtrl and not holdingShift then
+			-- The resync hotkey moved to Ctrl+F6 (Shared/ResyncHandler.lua), so the
+			-- Shift guard that used to sit here is gone with it.
+			if holdingCtrl then
 				SM("Replaying Song")
 				SCREENMAN:GetTopScreen():SetNextScreenName("ScreenGameplay"):StartTransitioningScreen("SM_GoToNextScreen")
 			end
@@ -18,9 +15,6 @@ local RestartHandler = function(event)
 	elseif event.type == "InputEventType_Release" then
 		if event.DeviceInput.button == "DeviceButton_left ctrl" then
 			holdingCtrl = false
-		elseif event.DeviceInput.button == "DeviceButton_left shift"
-		    or event.DeviceInput.button == "DeviceButton_right shift" then
-			holdingShift = false
 		end
 	end
 end

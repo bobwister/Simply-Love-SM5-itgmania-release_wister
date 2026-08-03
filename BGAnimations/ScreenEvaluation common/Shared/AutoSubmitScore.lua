@@ -171,6 +171,29 @@ local ScreenshotQR = function(playernum)
 	end
 end
 
+-- Resolve a pane by its manifest id instead of a literal actor name.
+--
+-- Panes are named after their COMPACTED position (Panes/default.lua): the counter
+-- only advances for panes that actually loaded. So "Pane7_SideP1" stops being the
+-- Upload pane the moment anything ahead of it returns nil -- InputTest does exactly
+-- that whenever OnlyDedicatedMenuButtons is off, which is the default, and ScoreEX
+-- does too outside ITG mode with the FA+ pane on. With one pane missing there is no
+-- "Pane10" at all, and indexing the nil it returns took this whole callback down --
+-- leaving the score submitted server-side but "Submitting ..." on screen forever.
+
+-- The offset frame the loader wraps each pane in, or nil if that pane isn't loaded.
+local PaneFrameById = function(panes, id, pn)
+	local index = EvalPaneIndex(pn, id)
+	if not index then return nil end
+	return panes:GetChild("Pane"..index.."_Side"..pn)
+end
+
+-- The pane's own actor, for reaching inside it.
+local PaneById = function(panes, id, i)
+	local frame = PaneFrameById(panes, id, "P"..i)
+	return frame and frame:GetChild("")
+end
+
 local AutoSubmitRequestProcessor = function(res, overlay)
 	local P1SubmitText = overlay:GetChild("AutoSubmitMaster"):GetChild("P1SubmitText")
 	local P2SubmitText = overlay:GetChild("AutoSubmitMaster"):GetChild("P2SubmitText")
@@ -198,12 +221,12 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 			local playerStr = "player"..i
 			local entryNum = 1
 			local rivalNum = 1
-			-- Pane 8 is the groovestats highscores pane.
-			local highScorePane = panes:GetChild("Pane8_SideP"..i):GetChild("")
-			local QRPane = panes:GetChild("Pane7_SideP"..i):GetChild("")
+			-- Any of these may be nil: each pane decides for itself whether to load.
+			local highScorePane = PaneById(panes, "World",  i)
+			local QRPane        = PaneById(panes, "Upload", i)
 
-			local RPGPane = panes:GetChild("Pane9_SideP"..i):GetChild("")
-			local ITLPane = panes:GetChild("Pane10_SideP"..i):GetChild("")
+			local RPGPane       = PaneById(panes, "RPG",    i)
+			local ITLPane       = PaneById(panes, "ITL",    i)
 
 			local boogie = false
 			local boogie_ex = false
@@ -241,7 +264,7 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 						leaderboardData = data[playerStr]["gsLeaderboard"]
 					end
 
-					if leaderboardData then
+					if leaderboardData and highScorePane then
 						for gsEntry in ivalues(leaderboardData) do
 							local entry = highScorePane:GetChild("HighScoreList"):GetChild("HighScoreEntry"..entryNum)
 							entry:stoptweening()
@@ -276,8 +299,10 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 							entryNum = entryNum + 1
 						end
 
-						QRPane:GetChild("QRCode"):queuecommand("Hide")
-						QRPane:GetChild("HelpText"):settext("Score has already been submitted :)")
+						if QRPane then
+							QRPane:GetChild("QRCode"):queuecommand("Hide")
+							QRPane:GetChild("HelpText"):settext("Score has already been submitted :)")
+						end
 						if i == 1 and P1SubmitText then
 							P1SubmitText:queuecommand("Submit")
 						elseif i == 2 and P2SubmitText then
@@ -285,7 +310,7 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 						end
 					end
 
-					if data[playerStr]["rpg"] then
+					if data[playerStr]["rpg"] and RPGPane then
 						local rpgEntry = 1
 						local rpgRival = 1
 						for gsEntry in ivalues(data[playerStr]["rpg"]["rpgLeaderboard"]) do
@@ -314,7 +339,7 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 						end
 					end
 
-					if data[playerStr]["itl"] then
+					if data[playerStr]["itl"] and ITLPane then
 						local itlEntry = 1
 						local itlRival = 1
 						for gsEntry in ivalues(data[playerStr]["itl"]["itlLeaderboard"]) do
@@ -407,7 +432,7 @@ local AutoSubmitRequestProcessor = function(res, overlay)
 
 			-- Empty out any remaining entries on a successful response.
 			-- For failed responses we fallback to the scores available in the machine.
-			if res["status"] == "success" then
+			if res["status"] == "success" and highScorePane then
 				for j=entryNum, NumEntries do
 					local entry = highScorePane:GetChild("HighScoreList"):GetChild("HighScoreEntry"..j)
 					entry:stoptweening()
@@ -578,7 +603,8 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		else
 			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
-		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
+		local uploadP2 = PaneFrameById(p2pane, "Upload", "P2")
+		if uploadP2 then uploadP2:visible(true):sleep(0.2):diffusealpha(0) end
 		self:sleep(0.1):queuecommand("SS")
 	end,
 	TimedOutCommand=function(self)
@@ -590,7 +616,8 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		else
 			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
-		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
+		local uploadP2 = PaneFrameById(p2pane, "Upload", "P2")
+		if uploadP2 then uploadP2:visible(true):sleep(0.2):diffusealpha(0) end
 		self:sleep(0.1):queuecommand("SS")
 	end,
 	SSCommand=function(self)
@@ -621,7 +648,8 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		else
 			p1pane:GetChild("Pane" .. (EvalPaneIndex("P1", SL["P1"].EvalPaneSecondary) or 1) .. "_SideP1"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
-		p1pane:GetChild("Pane7_SideP1"):visible(true):sleep(0.2):diffusealpha(0)
+		local uploadP1 = PaneFrameById(p1pane, "Upload", "P1")
+		if uploadP1 then uploadP1:visible(true):sleep(0.2):diffusealpha(0) end
 		self:sleep(0.1):queuecommand("SS")
 	end,
 	TimedOutCommand=function(self)
@@ -633,7 +661,8 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal").. {
 		else
 			p2pane:GetChild("Pane" .. (EvalPaneIndex("P2", SL["P2"].EvalPaneSecondary) or 1) .. "_SideP2"):visible(false):diffusealpha(0):sleep(0.2):visible(true):diffusealpha(1)
 		end
-		p2pane:GetChild("Pane7_SideP2"):visible(true):sleep(0.2):diffusealpha(0)
+		local uploadP2 = PaneFrameById(p2pane, "Upload", "P2")
+		if uploadP2 then uploadP2:visible(true):sleep(0.2):diffusealpha(0) end
 		self:sleep(0.1):queuecommand("SS")
 	end,
 	SSCommand=function(self)

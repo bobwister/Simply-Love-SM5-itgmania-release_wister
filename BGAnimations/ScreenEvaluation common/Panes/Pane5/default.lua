@@ -210,7 +210,7 @@ if count > 0 then
 	local x = XForOffset(avg_offset / 1000)
 	if x >= 0 and x <= pane_width then mean_x = x end
 
-	-- Ctrl+Shift+R resyncs the song's #OFFSET to cancel this very mean, and nothing on the
+	-- Ctrl+F6 resyncs the song's #OFFSET to cancel this very mean, and nothing on the
 	-- screen said so -- the feature was discoverable only by reading ResyncHandler.lua.
 	--
 	-- Shown only when it would actually do something, and only when it would actually
@@ -229,11 +229,15 @@ if count > 0 then
 		-- covered by the top bar's background quad, which is added further down this file
 		-- and therefore draws on top. The left edge is the worst-judgment end of the
 		-- scale, where there is essentially never a bar to collide with.
+		--
+		-- Sits BELOW the "Early" label rather than beside it: that label is also
+		-- left-anchored (x=10, y=-125, zoom 0.5, further down this file), so the two
+		-- shared the same corner and overlapped.
 		pane[#pane+1] = Def.BitmapText{
 			Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 			Text=ScreenString("ResyncHint"),
 			InitCommand=function(self)
-				self:horizalign(left):xy(4, -body_height + 8):zoom(0.38)
+				self:horizalign(left):xy(4, -body_height + 27):zoom(0.38)
 					:diffuse(MEAN_COLOR):diffusealpha(0.9)
 					:maxwidth((pane_width - 8) / 0.38)
 			end,

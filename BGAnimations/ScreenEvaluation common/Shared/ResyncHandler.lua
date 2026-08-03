@@ -1,4 +1,4 @@
--- Ctrl+Shift+R on ScreenEvaluation: resync the just-played song's #OFFSET to
+-- Ctrl+F6 on ScreenEvaluation: resync the just-played song's #OFFSET to
 -- cancel the (solo) player's systematic timing bias — their signed mean offset.
 -- The math + file IO live in ResyncSongOffsetFromMean() (Scripts/SL-Helpers.lua);
 -- this actor wires up the hotkey (solo only, not course mode)
@@ -10,9 +10,8 @@ local Players = GAMESTATE:GetHumanPlayers()
 -- exactly one human player is joined; that player's mean drives the resync.
 local player = (#Players == 1) and Players[1] or nil
 
--- modifier state for the Ctrl+Shift+R combo, plus a debounce while feedback shows
-local holdingCtrl  = false
-local holdingShift = false
+-- modifier state for the Ctrl+F6 combo, plus a debounce while feedback shows
+local holdingCtrl = false
 local busy = false
 
 local ResyncInputHandler = function(event)
@@ -22,10 +21,8 @@ local ResyncInputHandler = function(event)
 		local btn = event.DeviceInput.button
 		if btn == "DeviceButton_left ctrl" or btn == "DeviceButton_right ctrl" then
 			holdingCtrl = true
-		elseif btn == "DeviceButton_left shift" or btn == "DeviceButton_right shift" then
-			holdingShift = true
-		elseif btn == "DeviceButton_r" then
-			if holdingCtrl and holdingShift and not busy then
+		elseif btn == "DeviceButton_F6" then
+			if holdingCtrl and not busy then
 				busy = true
 				local result, reason = ResyncSongOffsetFromMean(player)
 				MESSAGEMAN:Broadcast("SongResynced", { result=result, reason=reason })
@@ -36,8 +33,6 @@ local ResyncInputHandler = function(event)
 		local btn = event.DeviceInput.button
 		if btn == "DeviceButton_left ctrl" or btn == "DeviceButton_right ctrl" then
 			holdingCtrl = false
-		elseif btn == "DeviceButton_left shift" or btn == "DeviceButton_right shift" then
-			holdingShift = false
 		end
 	end
 end
@@ -53,7 +48,7 @@ local t = Def.ActorFrame{
 		-- Deliberately NOT gated on the KeyboardFeatures theme option. That option defaults
 		-- to false, which made this hotkey invisible and inert on a fresh install with no
 		-- hint that an option governed it. It costs nothing to leave registered: the
-		-- callback only ever reacts to Ctrl+Shift held together with R.
+		-- callback only ever reacts to Ctrl held together with F6.
 		if player
 		and not GAMESTATE:IsCourseMode() then
 			SCREENMAN:GetTopScreen():AddInputCallback(ResyncInputHandler)
