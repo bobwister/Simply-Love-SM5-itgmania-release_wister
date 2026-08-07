@@ -5,46 +5,21 @@ local num_visible_items = num_items - 2
 
 local item_width = _screen.w / 2.125
 
--- the MusicWheelItem for CourseMode contains the basic colored Quads
--- use that as a common base, and add in a Sprite for "Has Edit"
+-- the MusicWheelItem for CourseMode contains the basic colored Quads,
+-- use that as a common base
 local af = LoadActor("../MusicWheelItem Course NormalPart.lua")
-
-local stepstype = GAMESTATE:GetCurrentStyle():GetStepsType()
 
 local IsNotWide = (GetScreenAspectRatio() < 16/9)
 
--- Right-aligned data columns at the end of each row, reading left to right:
--- points, global ITL rank, then a two-line stack of EX score over ITG score.
---
--- The bottom line of that stack (y=10) is the one level with points and rank, so
--- it holds the ITG score -- the only one of the two that every row has.
---
--- The row plate spans 0 .. item_width from the frame origin, so anchoring to
--- item_width puts the group hard against the row's right edge instead of
--- leaving the ~36px of dead margin the old _screen.w/2.14 anchor did.
---
--- TWEAK: ITL_SCALE sizes the whole right-hand group -- the text AND the column
--- offsets together, which is the only way to resize it safely. The offsets below
--- were measured to fit these numbers at the base size, so scaling the text alone
--- makes the columns run into each other, and scaling the offsets alone leaves
--- gaps. Both derive from this one number.
---
--- The columns grow leftward from a fixed right margin, so raising this pushes
--- ITL_BLOCK_LEFT further left and the song title must give up exactly that many
--- pixels: TextBanner's maxwidth in metrics.ini carries the matching subtraction,
--- and the comment there shows the arithmetic. At 1.4 the group widened by 44px.
-local ITL_SCALE = 1.4
+-- Two right-aligned stacks at the end of the row: EX over ITG score, and -- event packs
+-- only -- ITL points over ITL rank (or an SRPG rate). Geometry in
+-- Scripts/SL-Helpers-WheelRow.lua, which the song title's maxwidth reads from too.
+local cols = WheelRowColumns()
 
-local ITL_ZOOM = 0.40 * ITL_SCALE
-local ITL_ANCHOR   = item_width - 14
-local ITL_COL_EX   = ITL_ANCHOR - 24 * ITL_SCALE
-local ITL_COL_RANK = ITL_ANCHOR - 38 * ITL_SCALE
-local ITL_COL_PTS  = ITL_ANCHOR - 70 * ITL_SCALE
--- Left edge of the whole group, i.e. where the title has to stop.
-local ITL_BLOCK_LEFT = ITL_COL_PTS - 40 * ITL_SCALE
--- Dim gray for the "PTS"/"ITL"/"EX" micro-labels, matching the leading-zero
--- treatment already used on the evaluation screen.
-local ITL_LABEL_COLOR = color("#5A6166")
+local ITL_ZOOM        = cols.zoom
+local ITL_COL_EX      = cols.col_score
+local ITL_COL_EVENT   = cols.col_event
+local ITL_LABEL_COLOR = cols.label_color
 
 -- The chart a wheel row resolves to: this row's song, at the difficulty and steps type the
 -- player currently has selected. Shared by the ITG score column and the EX one below, so
@@ -165,29 +140,14 @@ if ThemePrefs.Get("SongSelectBG") ~= "Off" then
 	}
 end
 
--- using a png in a Sprite ties the visual to a specific rasterized font (currently Miso),
--- but Sprites are cheaper than BitmapTexts, so we should use them where dynamic text is not needed
-af[#af+1] = Def.Sprite{
-	Texture=THEME:GetPathG("", "Has Edit (doubleres).png"),
-	InitCommand=function(self)
-		-- sits immediately left of the points/rank/EX group, which now runs to
-		-- the row's right edge
-		self:horizalign(right):visible(false):zoom(0.375)
-		self:x( ITL_BLOCK_LEFT - 6 )
-
-		if DarkUI() then self:diffuse(0,0,0,1) end
-	end,
-	SetCommand=function(self, params)
-		self:visible(params.Song and params.Song:HasEdits(stepstype) or false)
-	end
-}
+-- The "Has Edit" badge that sat here is gone; the title uses that strip now.
 
 for player in ivalues(PlayerNumber) do
 	af[#af+1] = LoadActor("GetLamp.lua", player)
 	af[#af+1] = LoadActor("Favorites.lua", player)
 
-	-- EX score column at the end of the row. Solo draws one line level with the
-	-- points/rank columns; versus stacks P1 above P2.
+	-- EX score, top line of the score column (ITG sits below it). Versus stacks P1 above P2
+	-- in those same two lines.
 	af[#af+1] = Def.BitmapText{
 		Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 		Text="",
@@ -249,7 +209,7 @@ for player in ivalues(PlayerNumber) do
 						local hash = SL[pn].ITLData["pathMap"][song_dir]
 						if SL[pn].ITLData["hashMap"][hash] ~= nil then
 							-- Always the EX score here; points now live in the dedicated,
-							-- rank-tier-colored points/rank subtitle line below.
+							-- rank-tier-colored event column to the left.
 							--
 							-- ITL wins over the theme's own record when both exist: it is
 							-- the figure the event itself scored you on, and it is what the
@@ -372,31 +332,26 @@ for player in ivalues(PlayerNumber) do
 
 end
 
--- Global ITL points + global ITL rank, as a subtitle line reading (left to
--- right) "points, rank, ITG score": same vertical level (y=10) and font size
--- (zoom 0.4) as the ITG score at the end of the line (the EX score sits one line
--- above it, at y=0), positioned just to its left. Solo,
--- persistent-profile player only. Points are color-coded by the song's LOCAL
--- top-N standing (green = top75, yellow = top150, white otherwise); rank is
--- the GLOBAL ITL leaderboard rank, fetched on demand (see
--- Scripts/SL-Helpers-ITLRank.lua and
--- BGAnimations/ScreenSelectMusic overlay/ITLRankManager.lua).
+-- Global ITL points, top line of the event column (the ITL rank sits below it). Solo,
+-- persistent-profile player only. Color-coded by the song's LOCAL top-N standing
+-- (green = top75, yellow = top150, white otherwise).
 af[#af+1] = Def.BitmapText{
 	Font=ThemePrefs.Get("ThemeFont") .. " Normal",
 	Text="",
 	InitCommand=function(self)
-		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(10)
-		self:x( ITL_COL_PTS )
+		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(0)
+		self:x( ITL_COL_EVENT )
 		self.hash = nil
 	end,
 	SetCommand=function(self, params)
 		self:visible(false)
 		self.hash = nil
 
-		local humans = GAMESTATE:GetHumanPlayers()
-		if #humans ~= 1 then return end
-		local player = humans[1]
-		if not PROFILEMAN:IsPersistentProfile(player) then return end
+		-- Same gate the title's maxwidth uses: on a row it turns down, the title has
+		-- already been widened across this column, so nothing may draw here.
+		if not WheelRowHasEventColumn(params.Song) then return end
+
+		local player = GAMESTATE:GetHumanPlayers()[1]
 		local pn = ToEnumShortString(player)
 
 		-- An SRPG pack takes this column over entirely: no ITL hash is resolved, so no
@@ -525,18 +480,19 @@ af[#af+1] = Def.BitmapText{
 	Text="",
 	Name="ITLGlobalRank",
 	InitCommand=function(self)
+		-- bottom line of the event column, under the points
 		self:visible(false):horizalign(right):zoom(ITL_ZOOM):y(10)
-		self:x( ITL_COL_RANK )
+		self:x( ITL_COL_EVENT )
 		self.hash = nil
 	end,
 	SetCommand=function(self, params)
 		self:visible(false)
 		self.hash = nil
 
-		local humans = GAMESTATE:GetHumanPlayers()
-		if #humans ~= 1 then return end
-		local player = humans[1]
-		if not PROFILEMAN:IsPersistentProfile(player) then return end
+		-- See the points column above: same gate, same reason.
+		if not WheelRowHasEventColumn(params.Song) then return end
+
+		local player = GAMESTATE:GetHumanPlayers()[1]
 		local pn = ToEnumShortString(player)
 
 		-- An SRPG song has no ITL standing, so don't resolve a hash for it and above all
