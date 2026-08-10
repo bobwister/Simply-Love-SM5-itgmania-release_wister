@@ -311,7 +311,7 @@ return Def.ActorFrame{
 					self:x(SL_WideScale(18, 30) * 2 + SL_WideScale(5, 8) -9.2)
 				end
 			else
-				self:x(3)
+				self:x(9)
 			end
 			self:settext(param.count):visible(true):diffuse(SL.JudgmentColors["FA+"][param.lamp+1])
 		end,

@@ -29,7 +29,7 @@ local ITL_VALUE_X =  W/2 - PAD
 -- and none is width-bound. Height binds instead. Not SL_LowRes'd -- the card does not grow.
 local ROW_ZOOM   = 0.56
 local TITLE_ZOOM = 0.38
-local TITLE_Y    = 4
+local TITLE_Y    = 6
 
 local RULE_Y = 44
 
