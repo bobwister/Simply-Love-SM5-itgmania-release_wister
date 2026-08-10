@@ -25,25 +25,38 @@ local PAD = 4
 
 local ITL_LABEL_X = -W/2 + PAD
 local ITL_VALUE_X =  W/2 - PAD
--- 0.34 is ~9 real pixels at 480p. maxwidth below divides by the zoom, so raising
--- it buys height without growing into the figure's column.
-local ITL_LABEL_ZOOM = SL_LowRes(0.34, 0.44)
-local ITL_VALUE_ZOOM = SL_LowRes(0.46, 0.54)
-
--- The event block holds up to MAX_EVENT_ROWS rows, and however many the active event
--- actually has are centred in it -- ITL has three, Stamina RPG two. Positions are worked
--- out per refresh rather than fixed at init, so switching events re-centres the block
--- instead of leaving a hole where the third row used to be.
-local MAX_EVENT_ROWS = 3
-local ROW_BLOCK_CY   = 21
--- Three rows at 15 span y=6..36 around ROW_BLOCK_CY, still clear of RULE_Y.
-local ROW_SPACING    = SL_LowRes(13, 15)
-
-local function RowY(i, count)
-	return ROW_BLOCK_CY + (i - (count + 1)/2) * ROW_SPACING
-end
+-- One size for every label and figure: the heading names the event, so no label repeats it
+-- and none is width-bound. Height binds instead. Not SL_LowRes'd -- the card does not grow.
+local ROW_ZOOM   = 0.56
+local TITLE_ZOOM = 0.38
+local TITLE_Y    = 4
 
 local RULE_Y = 44
+
+-- A line can carry two figures, so lines ~= figures: SRPG uses two, ITL three. Lines are
+-- spread through the band between heading and rule rather than pitched fixed, so a two-line
+-- layout gets the room a three-line one cannot. LINE_MAX_PITCH caps how far they spread.
+local MAX_EVENT_ROWS  = 3
+local LINE_MAX_PITCH  = 14
+local LINE_BAND_TOP   = TITLE_Y  + 7*TITLE_ZOOM + 2 + 8*ROW_ZOOM   -- first line's centre
+local LINE_BAND_BOT   = RULE_Y   - 8*TITLE_ZOOM - 2 - 7*ROW_ZOOM   -- last line's centre
+
+local function LineY(line, count)
+	if count < 2 then return (LINE_BAND_TOP + LINE_BAND_BOT) / 2 end
+
+	local pitch = math.min(LINE_MAX_PITCH, (LINE_BAND_BOT - LINE_BAND_TOP) / (count - 1))
+	return (LINE_BAND_TOP + LINE_BAND_BOT)/2 + (line - (count + 1)/2) * pitch
+end
+
+-- Just right of centre: the left half carries the two longest labels, the right a short one.
+local SPLIT_X   = 2
+local SPLIT_GAP = 6
+
+local SLOT_X = {
+	full  = { label = ITL_LABEL_X,              value = ITL_VALUE_X },
+	left  = { label = ITL_LABEL_X,              value = SPLIT_X - SPLIT_GAP/2 },
+	right = { label = SPLIT_X + SPLIT_GAP/2,    value = ITL_VALUE_X },
+}
 
 -- Star tally: five tiers, best first, in a 3+2 grid.
 --
@@ -55,11 +68,11 @@ local RULE_Y = 44
 -- TWEAK: ICON_SIZE has to leave the count room on the right of its cell -- a four-digit
 -- count is the widest a cell ever gets.
 local CELL_W     = (W - 2*PAD) / 3
-local STAR_ROW_Y = { 54, 68 }
+local STAR_ROW_Y = { 56, 70 }
 local ICON_SIZE  = 14
 local ICON_X     = 2 + ICON_SIZE/2      -- from the cell's left edge
--- ~23px left in the cell once the 14px icon is placed: four digits fit at 0.50.
-local COUNT_ZOOM = SL_LowRes(0.42, 0.50)
+-- 0.58 is where a four-digit count stops fitting beside the icon.
+local COUNT_ZOOM = SL_LowRes(0.50, 0.58)
 
 local GRADE_SHEET = THEME:GetPathG("MusicWheelItem", "Grades/grades 1x18.png")
 local QUINT_ICON  = THEME:GetPathG("MusicWheelItem", "Grades/quint.png")
@@ -109,60 +122,33 @@ end
 -- label key -> which of the figures it prints. `fmt` is handed one table of everything
 -- the active event knows, so a row can print more than one figure without the caller
 -- having to know which rows do.
+-- `line` is the block line, `slot` how it shares that line, `fig` the room its value needs
+-- (the label's maxwidth is the rest of the slot). `fig` is per-figure, not per-slot: "11" and
+-- "1.30x" share the left half, and one reserve for both would squeeze the level's label.
 local ITL_ROWS = {
-	{ key="ItlRankingPoints", fmt=function(s) return Commas(s.rp)     end },
-	{ key="ItlTotalPoints",   fmt=function(s) return Commas(s.tp)     end },
-	{ key="ItlChartsPassed",  fmt=function(s) return Commas(s.passed) end },
+	{ key="ItlRankingPoints", line=1, slot="full", fig=34, fmt=function(s) return Commas(s.rp)     end },
+	{ key="ItlTotalPoints",   line=2, slot="full", fig=34, fmt=function(s) return Commas(s.tp)     end },
+	{ key="ItlChartsPassed",  line=3, slot="full", fig=34, fmt=function(s) return Commas(s.passed) end },
 }
 
--- The equivalent rows during a Stamina RPG season. Two, not three: SRPG has no points to
--- show. Its API node carries a per-chart leaderboard, a result string, and quest/stat
--- progress that arrives once in the submit response and is never persisted -- there is no
--- equivalent of itl2024.json.
---
--- All three are records of things that happened, not statistics derived from them: the
--- best rate you cleared at, the hardest chart and fastest song you got through, and how
--- many songs are in the record. An average rate briefly sat here and has been taken out --
--- nothing in SRPG defines such a figure, so it was a number of my own invention sitting
--- among official ones.
---
--- The middle row prints two figures, which is why fmt takes the whole stats table.
---
--- Only these rows swap. The star tally and the cleared count below the rule are read off
--- the profile's own scores and mean the same thing whichever event is running.
+-- Stamina RPG: three personal records. No average rate -- SRPG defines no such figure -- and
+-- no songs-cleared, which duplicated the ✔ tally below the rule. The rate takes the LEFT
+-- slot so its figure lands under the level's, which makes the two lines read as one table.
 local SRPG_ROWS = {
-	{ key="SrpgBestRate", fmt=function(s) return ("%.2fx"):format(s.best) end },
-	-- Two labelled figures on one line. `composite` tells the generic row loop to leave
-	-- this slot alone -- it is drawn by the chained frame further down instead, which the
-	-- usual label-left/value-right pair cannot express.
-	{ composite=true },
-	{ key="SrpgSongsCleared", fmt=function(s) return Commas(s.cleared) end },
+	{ key="SrpgMaxLevel", line=1, slot="left",  fig=11, fmt=function(s) return s.meter and tostring(s.meter) or "--" end },
+	{ key="SrpgMaxBpm",   line=1, slot="right", fig=18, fmt=function(s) return s.bpm and ("%.0f"):format(s.bpm) or "--" end },
+	{ key="SrpgMaxRate",  line=2, slot="left",  fig=21, fmt=function(s) return s.best and ("%.2fx"):format(s.best) or "--" end },
 }
 
--- Which set of rows the card is showing, and the SRPG season if that is the one.
--- Re-asked on every Refresh rather than settled at load, so swapping to a profile with a
--- different history moves the card with it.
---
--- Declared BEFORE CompositeRow, and that order matters: a `local function` is only in
--- scope from its own declaration onward, so a caller written above it would bind the
--- name to a nil global instead. The row actors further down escape this because their
--- commands are closures created after both declarations.
+-- Rows, the SRPG event if active, the heading key, and the season it quotes. Re-asked every
+-- Refresh so a profile switch moves the card. The season is named because both helpers return
+-- only the NEWEST installed one, so the figures are scoped to it.
 local function ActiveRows()
 	if SRPGIsActiveEvent() then
 		local event = SRPGCurrentEvent()
-		if event then return SRPG_ROWS, event end
+		if event then return SRPG_ROWS, event, "SrpgCardTitle", event end
 	end
-	return ITL_ROWS, nil
-end
-
--- Where the composite row sits in the active set, if it is showing at all.
--- Returns index, row count, event -- or nil.
-local function CompositeRow()
-	local rows, event = ActiveRows()
-	for i, row in ipairs(rows) do
-		if row.composite then return i, #rows, event end
-	end
-	return nil
+	return ITL_ROWS, nil, "ItlCardTitle", ITLCurrentSeason()
 end
 
 local af = Def.ActorFrame{
@@ -202,134 +188,97 @@ local af = Def.ActorFrame{
 
 af[#af+1] = HUDCardDecor(W, H, 0, H/2)
 
--- The event block: one labelled figure per row, label left, figure right. How many rows
--- there are, and what they say, depends on the season -- see ActiveRows. Rows past the
--- active event's count hide themselves.
+-- Names the event once, so no label below repeats it. Accent-coloured like the rule, so the
+-- two read as the frame around the figures rather than as data.
+af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+	Name="EventTitle",
+	InitCommand=function(self)
+		self:horizalign(left):xy(ITL_LABEL_X, TITLE_Y):zoom(TITLE_ZOOM)
+		self:maxwidth((W - 2*PAD) / TITLE_ZOOM)
+		self:playcommand("Paint")
+	end,
+	PaintCommand=function(self) self:diffuse( DimColor(Accent(), 1.0, 0.90) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
+	-- {n} is the season, placed by the language file's own word order. gsub, not format: with
+	-- no event pack installed the slot collapses -- along with its space -- instead of "nil".
+	RefreshCommand=function(self)
+		local _, _, title, season = ActiveRows()
+
+		local text = THEME:GetString("ScreenSelectMusic", title)
+		if season then
+			text = text:gsub("{n}", tostring(season))
+		else
+			text = text:gsub("%s*{n}", "")
+		end
+
+		self:settext(text)
+	end
+}
+
+-- Read off the rows, so a row list stays the single description of its own layout.
+local function LineCount(rows)
+	local n = 0
+	for _, row in ipairs(rows) do n = math.max(n, row.line) end
+	return n
+end
+
+-- x and maxwidth are settled per refresh, not at init: the same actor is a full-width slot
+-- under ITL and a half-width one under SRPG.
 for i = 1, MAX_EVENT_ROWS do
 	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="EventLabel"..i,
 		InitCommand=function(self)
-			self:horizalign(left):x(ITL_LABEL_X):zoom(ITL_LABEL_ZOOM)
-			self:maxwidth((W - 2*PAD - 34) / ITL_LABEL_ZOOM):diffuse(HUD_LABEL)
+			self:horizalign(left):zoom(ROW_ZOOM):diffuse(HUD_LABEL)
 		end,
 		RefreshCommand=function(self)
 			local rows = ActiveRows()
-			if i > #rows or rows[i].composite then self:visible(false) return end
+			if i > #rows then self:visible(false) return end
 
-			self:visible(true):y( RowY(i, #rows) )
-			self:settext( THEME:GetString("ScreenSelectMusic", rows[i].key) )
+			local row  = rows[i]
+			local slot = SLOT_X[row.slot]
+
+			self:visible(true):xy( slot.label, LineY(row.line, LineCount(rows)) )
+			self:maxwidth( (slot.value - slot.label - row.fig) / ROW_ZOOM )
+			self:settext( THEME:GetString("ScreenSelectMusic", row.key) )
 		end
 	}
 
 	af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		Name="EventValue"..i,
 		InitCommand=function(self)
-			self:horizalign(right):x(ITL_VALUE_X):zoom(ITL_VALUE_ZOOM)
-			self:diffuse(HUD_TEXT)
+			self:horizalign(right):zoom(ROW_ZOOM):diffuse(HUD_TEXT)
 		end,
-		-- "--" rather than 0 in both branches: no event file loaded is not the same as a
-		-- record of nothing.
+		-- "--" rather than 0, decided per figure: the level and bpm come off the profile's
+		-- scores, so gating them on the .rpg rate would hide figures that exist without it.
 		RefreshCommand=function(self)
 			local rows, event = ActiveRows()
-			if i > #rows or rows[i].composite then self:visible(false) return end
+			if i > #rows then self:visible(false) return end
 
-			self:visible(true):y( RowY(i, #rows) )
+			local row = rows[i]
+			self:visible(true):xy( SLOT_X[row.slot].value, LineY(row.line, LineCount(rows)) )
 
 			if event then
-				local best, cleared = SRPGProfileStats(player, event)
-				if not best then self:settext("--") return end
-
-				-- only asked for once there is something to report; it walks the season's
-				-- packs, so there is no point paying for it on an empty record
+				local best   = SRPGProfileStats(player, event)
 				local meter, bpm = SRPGPassedPeaks(player, event)
-				self:settext( rows[i].fmt{ best=best, cleared=cleared, meter=meter, bpm=bpm } )
+				self:settext( row.fmt{ best=best, meter=meter, bpm=bpm } )
 			else
 				local rp, tp, passed = GetItlStats()
-				self:settext( rp and rows[i].fmt{ rp=rp, tp=tp, passed=passed } or "--" )
+				self:settext( rp and row.fmt{ rp=rp, tp=tp, passed=passed } or "--" )
 			end
 		end
 	}
 end
 
--- The composite row: "<label> : <value> | <label> : <value>", laid out as a chain rather
--- than as one string with AddAttribute. Character offsets into a settext'd string index
--- characters, not bytes, so an accented label would shift them -- the chain keeps the
--- dim-label/bright-value contrast without that trap.
---
--- TWEAK: everything on this row shares PEAKS_ZOOM. It has to: the English line measures
--- 110px of the card's 118 at 0.34, so the figures cannot be set at the 0.46 the other
--- rows use for their values. Raising it means shortening the labels.
-local PEAKS_ZOOM = 0.34
-local PEAKS_PARTS = { "Label1", "Value1", "Sep", "Label2", "Value2" }
-
-local peaks = Def.ActorFrame{
-	Name="EventPeaks",
-	InitCommand=function(self) self:visible(false) end,
-
-	RefreshCommand=function(self)
-		local index, count, event = CompositeRow()
-		if not index or not event then self:visible(false) return end
-
-		-- Shown with "--" when there is nothing to report, exactly like the rows either
-		-- side of it. Hiding it instead left a gap in the middle of a three-row block.
-		--
-		-- And it is deliberately NOT gated on there being a .rpg record: these two come
-		-- from the profile's own scores, so a season played before the theme kept rates
-		-- -- or on a machine that never wrote the file -- still has a level and a bpm to
-		-- show. Gating them on the rate file hid figures that existed.
-		local meter, bpm = SRPGPassedPeaks(player, event)
-
-		-- The separators live here rather than in the language files, which trim
-		-- surrounding whitespace out of their values.
-		self:GetChild("Label1"):settext( THEME:GetString("ScreenSelectMusic", "SrpgHighestLevel") .. " : " )
-		self:GetChild("Value1"):settext( meter and tostring(meter) or "--" )
-		self:GetChild("Sep"):settext("  |  ")
-		self:GetChild("Label2"):settext( THEME:GetString("ScreenSelectMusic", "SrpgHighestBpm") .. " : " )
-		self:GetChild("Value2"):settext( bpm and ("%.0f BPM"):format(bpm) or "-- BPM" )
-
-		-- Chain them left to right off their own drawn widths, so the line closes up
-		-- around a one-digit level or a four-digit bpm instead of sitting on fixed anchors.
-		local x = -W/2 + PAD
-		for _, name in ipairs(PEAKS_PARTS) do
-			local part = self:GetChild(name)
-			part:x(x)
-			x = x + part:GetZoomedWidth()
-		end
-
-		self:visible(true):y( RowY(index, count) )
-	end,
-}
-
-for _, name in ipairs(PEAKS_PARTS) do
-	local bright = (name:match("^Value") ~= nil)
-
-	peaks[#peaks+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
-		Name=name,
-		Text="",
-		InitCommand=function(self)
-			self:horizalign(left):zoom(PEAKS_ZOOM)
-			self:diffuse( bright and HUD_TEXT or HUD_LABEL )
-		end
-	}
-end
-
-af[#af+1] = peaks
-
 -- The rule between the two blocks, captioned at its left end.
 --
--- The caption matters more than it looks: everything BELOW this rule is profile-wide, not
--- event-scoped. StarCountsCompute walks SONGMAN:GetAllSongs() -- the whole installed
--- library, filtered only by the current style -- and the cleared count comes off that same
--- walk. Sitting under an "SRPG"-headed block, those figures read as SRPG figures, which
--- they are not. (The quint tier is narrower still: only ITL data can tell a quint from the
--- quad it grades as, so that bucket only ever fills on ITL charts.) Labelling was chosen
--- over rescoping them.
+-- The caption is load-bearing: everything BELOW the rule is profile-wide, not event-scoped
+-- (StarCountsCompute walks SONGMAN:GetAllSongs()), so under an "SRPG"-headed block those
+-- figures would read as SRPG ones. Styled like the event heading because it is the same kind
+-- of thing. It rides the rule because there is no line to take -- the star rows already touch.
 --
--- TWEAK: CAPTION_W is the space reserved for the caption; the rule takes what is left.
--- A caption row of its own would not fit -- the two star rows already touch at y 61 and
--- the card ends 5px below the second, so this rides the rule instead.
-local CAPTION_ZOOM = 0.28
-local CAPTION_W    = 46
+-- CAPTION_W is its reserve, the rule takes the rest.
+local CAPTION_ZOOM = TITLE_ZOOM
+local CAPTION_W    = 50
 local CAPTION_GAP  = 4
 
 af[#af+1] = Def.Quad{
@@ -350,8 +299,10 @@ af[#af+1] = LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
 		self:horizalign(left):zoom(CAPTION_ZOOM)
 		self:xy(ITL_LABEL_X, RULE_Y)
 		self:maxwidth(CAPTION_W / CAPTION_ZOOM)
-		self:diffuse(HUD_LABEL)
+		self:playcommand("Paint")
 	end,
+	PaintCommand=function(self) self:diffuse( DimColor(Accent(), 1.0, 0.90) ) end,
+	ColorSelectedMessageCommand=function(self) self:playcommand("Paint") end,
 }
 
 -- Left edge and centre line of grid slot `slot` (1..6), in reading order.

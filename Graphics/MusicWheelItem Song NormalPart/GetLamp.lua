@@ -146,7 +146,8 @@ local function MaybeSetLampForUnmarkedItlSong(self, player)
 end
 
 return Def.ActorFrame{
-	Def.Quad{
+	-- ActorMultiVertex, not Quad: a Quad cannot draw the slanted edge. Geometry in SetCommand.
+	Def.ActorMultiVertex{
 		P1ChartParsedMessageCommand=function(self)
 			if player ~= PLAYER_1 then return end
 			MaybeSetLampForUnmarkedItlSong(self, player)
@@ -183,12 +184,26 @@ return Def.ActorFrame{
 			-- Technique HUD: in solo the lamp is a full-height bar down the row's
 			-- leading edge, so clear state reads at a glance. In versus it stays
 			-- the small marker so both players' lamps still fit side by side.
-			if GAMESTATE:GetNumSidesJoined() == 1 then
-				self:zoomto(SL_WideScale(5, 6), item_height - 2)
-			else
-				self:zoomto(SL_WideScale(5, 6), 31)
-			end
-			self:horizalign(right)
+			--
+			-- A parallelogram, because the plate's leading edge is bevelled. Vertices rather
+			-- than skewx(): the engine composes skew and scale on opposite sides of the
+			-- matrix (Actor.cpp:705 vs 740), so a skew's value is not the slope. Left white
+			-- because ActorMultiVertex multiplies its diffuse into the vertex colours
+			-- (ActorMultiVertex.cpp:218), so the diffuse calls below still carry.
+			local h = (GAMESTATE:GetNumSidesJoined() == 1) and (item_height - 2) or 31
+			local w = SL_WideScale(5, 6)
+
+			local lean = SL_WHEEL_BEVEL * (h / item_height) / 2
+			local top, bot = -h/2, h/2
+			local edge_top, edge_bot = SL_WHEEL_BEVEL/2 + lean, SL_WHEEL_BEVEL/2 - lean
+			local white = {1,1,1,1}
+
+			self:SetDrawState({Mode="DrawMode_Fan"}):SetNumVertices(4):SetVertices{
+				{{edge_top - w, top, 0}, white},
+				{{edge_top,     top, 0}, white},
+				{{edge_bot,     bot, 0}, white},
+				{{edge_bot - w, bot, 0}, white},
+			}
 
 			-- Check ITL File
 			local itl_lamp = nil

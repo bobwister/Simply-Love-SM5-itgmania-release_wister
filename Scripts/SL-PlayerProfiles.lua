@@ -162,31 +162,22 @@ end
 
 
 -- -----------------------------------------------------------------------
--- Two things in the profile ini are NOT per-player modifiers: the Simply Love color and
--- which of the two online events the panels report on. They are single, theme-wide pieces
--- of state -- SL.Global.ActiveColorIndex and the ActiveEvent theme pref -- so they cannot
--- go through permitted_profile_settings, which exists to route keys into the per-player
--- SL[pn].ActiveModifiers table.
+-- The Simply Love color is theme-wide state (SL.Global.ActiveColorIndex), not a per-player
+-- modifier, so it cannot ride permitted_profile_settings. Applied by setting the same
+-- runtime state ScreenSelectColor sets rather than as a per-profile override, which would
+-- have shadowed the option row. Consequence: the machine pref becomes whatever the last
+-- profile to load wanted, and that is what a guest inherits.
 --
--- They are applied by setting the same runtime state the option screens set, rather than
--- by adding a per-profile override alongside it. That matters: every existing reader
--- (PlayerColor -> GetHexColor(SL.Global.ActiveColorIndex) in SL-Colors.lua, and
--- SRPGIsActiveEvent -> ThemePrefs.Get("ActiveEvent")) keeps working untouched, and the
--- option rows in the menus keep working too -- an override would have shadowed them, so
--- changing Active Event in the menu would have appeared to do nothing.
+-- ActiveEvent used to be carried here too. It is machine state, not a person's, and the
+-- round-trip broke the operator menu: the profile's copy is only written when the profile
+-- is SAVED, so a menu change was overwritten by the stale value at the next profile load --
+-- the one on the way to the song wheel. It appeared to revert to Auto on its own.
 --
--- The consequence to know: the machine-wide prefs become "whatever the last profile to
--- load wanted". That is already how SimplyLoveColor behaved, and it is what a guest with
--- no profile of their own inherits.
+-- ThemePrefs.Save() is deliberately NOT called: the profile ini is the source of truth and
+-- this runs on every profile switch.
 --
--- ThemePrefs.Save() is deliberately NOT called here. The profile ini is the source of
--- truth for these two, and this runs on every profile switch, so saving would rewrite the
--- machine ini each time for no gain.
---
--- Only the master player's profile is honoured. There is one color and one event panel for
--- the whole theme, so in versus the second profile to load would otherwise silently
--- overwrite the first; this way P2 switching profiles cannot repaint P1's theme. P2's own
--- values are still written to P2's profile by SaveProfileCustom, they are just not applied.
+-- Only the master player's profile is applied -- there is one color for the whole theme, so
+-- otherwise P2 switching profiles would repaint P1's. P2's own value is still written.
 local function ApplyGlobalProfileSettings(player, filecontents)
 	if not filecontents then return end
 	if player ~= (GAMESTATE:GetMasterPlayerNumber() or PLAYER_1) then return end
@@ -205,10 +196,6 @@ local function ApplyGlobalProfileSettings(player, filecontents)
 		end
 	end
 
-	local event = filecontents.ActiveEvent
-	if event == "Auto" or event == "ITL" or event == "SRPG" then
-		ThemePrefs.Set("ActiveEvent", event)
-	end
 end
 
 -- function assigned to "CustomLoadFunction" under [Profile] in metrics.ini
@@ -308,12 +295,9 @@ SaveProfileCustom = function(profile, dir)
 			-- and thus won't be handled in the loop above
 			output.PlayerOptionsString = SL[pn].PlayerOptionsString
 
-			-- Theme-wide settings kept per profile so the look and the event panel follow
-			-- whoever is playing. See ApplyGlobalProfileSettings for why these two can't
-			-- ride in permitted_profile_settings, and why only the master player's copy is
-			-- applied on load even though every profile writes its own.
+			-- Theme-wide, kept per profile so the look follows whoever is playing. See
+			-- ApplyGlobalProfileSettings -- including why ActiveEvent is no longer here.
 			output.SimplyLoveColor = SL.Global.ActiveColorIndex
-			output.ActiveEvent     = ThemePrefs.Get("ActiveEvent")
 
 			IniFile.WriteFile( path, {[theme_name]=output} )
 

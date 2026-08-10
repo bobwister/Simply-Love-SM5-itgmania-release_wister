@@ -257,6 +257,10 @@ end
 -- progress read, which means they also cover charts passed before the rate rules let
 -- anything be recorded.
 --
+-- Imported GrooveStats scores count too, as they do for the star tally, the wheel grades and
+-- the clear lamp. An import gives its METER exactly, but only the song's UNMODIFIED bpm:
+-- GrooveStats accepts 1.0x-3.0x and records the rate as free text, so it cannot be read back.
+--
 -- Every stored score on a chart is examined, not just the best one. The list is ordered by
 -- score, so the fastest pass is not necessarily first -- and the top entry can even be a
 -- failed run that out-percented the passes. (FolderProgressGet still looks only at the
@@ -304,6 +308,15 @@ SRPGPassedPeaks = function(player, event)
 								end
 							end
 						end
+					end
+
+					-- Imported pass. No grade test: the store holds passes only by
+					-- construction -- see Scripts/SL-Helpers-OnlineScores.lua.
+					if OnlineScorePassed(player, song, steps) then
+						local m = steps:GetMeter()
+						if meter == nil or m > meter then meter = m end
+
+						if song_top and (bpm == nil or song_top > bpm) then bpm = song_top end
 					end
 				end
 			end
