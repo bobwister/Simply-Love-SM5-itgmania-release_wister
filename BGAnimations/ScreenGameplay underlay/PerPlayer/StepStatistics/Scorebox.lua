@@ -370,12 +370,32 @@ local af = Def.ActorFrame{
 			self:x(self:GetX() * -1)
 		end
 		self.isFirst = true
+		self.StylesShown = 0
+	end,
+	-- Song changed (eg. next song in a course): rearm the once-through alternation
+	-- and bring the card back if a previous song had already faded it out.
+	CurrentSongChangedMessageCommand=function(self)
+		self.isFirst = true
+		self.StylesShown = 0
+		self:finishtweening():diffusealpha(1)
 	end,
 	CheckScoreboxCommand=function(self)
+		-- Count how many leaderboards actually have data, so the loop below can
+		-- alternate through each of them exactly once instead of forever.
+		self.AvailableCount = 0
+		for i=0,num_styles-1 do
+			if HasData(i) then
+				self.AvailableCount = self.AvailableCount + 1
+			end
+		end
+		self.StylesShown = 0
+		self:finishtweening():diffusealpha(1)
 		self:queuecommand("LoopScorebox")
 	end,
 	LoopScoreboxCommand=function(self)
 		if #all_data == 0 then return end
+
+		self.StylesShown = (self.StylesShown or 0) + 1
 
 		local start = cur_style
 
@@ -398,9 +418,12 @@ local af = Def.ActorFrame{
 			end
 		end
 
-		-- Loop only if there's something new to loop to.
-		if start ~= cur_style then
+		-- Alternate through each available leaderboard exactly once (eg. ITG then
+		-- Blue/EX scores), then fade the whole card out until the song changes.
+		if start ~= cur_style and self.StylesShown < (self.AvailableCount or 0) then
 			self:sleep(loop_seconds):queuecommand("LoopScorebox")
+		else
+			self:sleep(loop_seconds):linear(transition_seconds):diffusealpha(0)
 		end
 	end,
 
