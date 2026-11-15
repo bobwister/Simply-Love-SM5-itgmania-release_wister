@@ -23,6 +23,20 @@ local t = Def.ActorFrame{
 	}
 }
 
+-- Coming from ctrl+E in gameplay (see ScreenGameplay underlay/PracticeHotkey.lua):
+-- move the song cursor to where the run was. Slightly delayed so the screen has
+-- finished its own initialisation, which would otherwise reset the position.
+t[#t+1] = Def.Actor{
+	OnCommand=function(self) self:sleep(0.1):queuecommand("Seek") end,
+	SeekCommand=function(self)
+		local seconds = SL.Global.PracticeSeekSeconds
+		SL.Global.PracticeSeekSeconds = nil
+		if seconds then
+			SCREENMAN:GetTopScreen():SeekSong(seconds)
+		end
+	end,
+}
+
 local players =  GAMESTATE:GetHumanPlayers()
 for player in ivalues(players) do
 	local backgroundFilter = LoadActor("ScreenGameplay underlay/PerPlayer/BackgroundFilter.lua", player)

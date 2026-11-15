@@ -59,6 +59,8 @@ for player in ivalues(Players) do
 	end
 end
 
+t[#t+1] = LoadActor("./PracticeHotkey.lua") -- ctrl+E opens Practice Mode at the current position (EventMode only)
+
 -- UI elements shared by both players
 t[#t+1] = LoadActor("./Shared/VersusStepStatistics.lua")
 t[#t+1] = LoadActor("./Shared/Header.lua")
