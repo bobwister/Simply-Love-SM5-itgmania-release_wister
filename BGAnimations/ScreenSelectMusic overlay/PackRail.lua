@@ -299,7 +299,8 @@ end
 local redirected = false
 
 local function SetRedirect(on)
-	if on == redirected then return end
+	-- No early return on an unchanged value: another actor (ctrl+F song search) can
+	-- clear the engine-side redirect behind our back, leaving `redirected` stale.
 	redirected = on
 	for player in ivalues(GAMESTATE:GetHumanPlayers()) do
 		SCREENMAN:set_input_redirected(player, on)

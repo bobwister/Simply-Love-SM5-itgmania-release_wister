@@ -114,6 +114,9 @@ local af = Def.ActorFrame{
 
 	LoadActor("./SongSearch/default.lua"),
 
+	-- ctrl+F opens the Song Search text entry directly
+	LoadActor("./SongSearchHotkey.lua"),
+
 	-- ctrl+Up/Down or Select+MenuUp/Down live speedmod adjustment
 	LoadActor("./SpeedModHotkey.lua"),
 }
