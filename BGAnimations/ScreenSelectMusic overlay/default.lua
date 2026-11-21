@@ -114,8 +114,9 @@ local af = Def.ActorFrame{
 
 	LoadActor("./SongSearch/default.lua"),
 
-	-- ctrl+F opens the Song Search text entry directly
-	LoadActor("./SongSearchHotkey.lua"),
+	-- ctrl+F toggles the Favorites sort, ctrl+R opens the Song Search text entry,
+	-- and the engine's ctrl+letter "jump to songs starting with..." is undone
+	LoadActor("./MusicSelectHotkeys.lua"),
 
 	-- ctrl+Up/Down or Select+MenuUp/Down live speedmod adjustment
 	LoadActor("./SpeedModHotkey.lua"),
