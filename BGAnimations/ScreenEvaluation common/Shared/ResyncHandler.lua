@@ -56,6 +56,24 @@ local t = Def.ActorFrame{
 	end,
 }
 
+-- Permanent hint for the hotkey. The only other mention of it is on the offset-histogram
+-- pane (Panes/Pane5), which you have to navigate to and which only shows it when the
+-- mean is off-centre by a few ms -- so on the main evaluation view nothing said it
+-- existed. Same conditions as the callback above (solo, not course mode). Bottom centre,
+-- small and dim so it reads as a legend rather than content.
+local ResyncHintText = ScreenString("ResyncHint")
+
+if player and not GAMESTATE:IsCourseMode() then
+	t[#t+1] = LoadFont(NormalFont)..{
+		Name="ResyncHint",
+		Text=ResyncHintText,
+		InitCommand=function(self)
+			self:xy(_screen.cx, _screen.h - 8):zoom(0.4)
+				:diffuse(color("#7C939E")):diffusealpha(0.9)
+		end,
+	}
+end
+
 -- feedback overlay: hidden until a resync is attempted, then shown ~4s and faded
 t[#t+1] = Def.ActorFrame{
 	Name="ResyncFeedback",

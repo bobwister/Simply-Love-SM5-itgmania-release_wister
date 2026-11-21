@@ -165,6 +165,42 @@ af[#af+1] = Def.ActorFrame{
 }
 
 -- -----------------------------------------------------------------------
+-- left of the clocks: keyboard shortcut legend (ctrl+F favorites sort, ctrl+R song
+-- search -- see MusicSelectHotkeys.lua). Two stacked lines, right-aligned against the
+-- SESSION label. Hidden on low-res/cabinet displays like the pack rail's hints, and
+-- the search line only shows when KeyboardFeatures is on, since it is inert otherwise.
+-- Screen.String is only valid at file scope, hence the locals.
+--
+-- TWEAK: HINT_X is the right edge of the legend relative to screen centre; move it
+-- left if it touches the profile name at the far left of the footer.
+local HINT_FAVORITES = Screen.String("HotkeyFavorites")
+local HINT_SEARCH    = Screen.String("HotkeySearch")
+local HINT_X         = -126
+local HINT_ZOOM      = 0.3
+
+if not SL_IsLowRes() and not GAMESTATE:IsCourseMode() then
+	af[#af+1] = Def.ActorFrame{
+		InitCommand=function(self) self:xy(_screen.cx + HINT_X, footer_cy) end,
+
+		LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+			Text=HINT_FAVORITES,
+			InitCommand=function(self)
+				self:horizalign(right):zoom(HINT_ZOOM):y(-6):diffuse(label_color)
+				self:maxwidth(110 / HINT_ZOOM)
+			end
+		},
+		LoadFont(ThemePrefs.Get("ThemeFont") .. " Normal")..{
+			Text=HINT_SEARCH,
+			InitCommand=function(self)
+				self:horizalign(right):zoom(HINT_ZOOM):y(6):diffuse(label_color)
+				self:maxwidth(110 / HINT_ZOOM)
+				self:visible(ThemePrefs.Get("KeyboardFeatures") and true or false)
+			end
+		},
+	}
+end
+
+-- -----------------------------------------------------------------------
 -- right: GrooveStats connection light
 --
 -- The light reports the actual state of the connection rather than just "on or off":
